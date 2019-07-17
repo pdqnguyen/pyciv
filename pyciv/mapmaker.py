@@ -4,8 +4,8 @@ import numpy as np
 import random
 from configparser import ConfigParser
 
-from tile import Tile, TileArray
-from features import FEATURES
+from .tile import Tile, TileArray
+from .features import FEATURES
 
 MAP_CONFIG_FILE = 'map.ini'
 
@@ -206,8 +206,10 @@ def build_feature(board, feature, size, stretch=0):
     return out
 
 
-def make(shape):
-    base_config, feature_config = get_config()
+def make(shape, map_config_file=None):
+    if map_config_file is None:
+        map_config_file = MAP_CONFIG_FILE
+    base_config, feature_config = get_config(map_config_file=map_config_file)
     board = TileArray(shape=shape)
     board.fill('ocean')
     conts = []

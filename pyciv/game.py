@@ -1,27 +1,24 @@
-#! /usr/bin/env python
-
-from argparse import ArgumentParser
-import mapmaker
-from render import RenderGame
-from tile import City
-from utils import distance
 import random
+
+from . import mapmaker
+from .render import RenderGame
+from .utils import distance
 
 MAX_ITER = 1000
 MIN_CITY_SEP = 4
 CITIES_PER_CIV = 1
 
 class Game(object):
-    def __init__(self, shape, civs):
+    def __init__(self, shape, civs, map_config_file=None):
         self.shape = shape
         self.civs = civs
-        self._init_map()
+        self._init_map(map_config_file=map_config_file)
         self._init_cities()
         self.turn = 0
         self.active = 0
 
-    def _init_map(self):
-        self.board = mapmaker.make(self.shape)
+    def _init_map(self, map_config_file=None):
+        self.board = mapmaker.make(self.shape, map_config_file=map_config_file)
 
     def _init_cities(self):
         for civ in self.civs:
@@ -55,13 +52,3 @@ class Game(object):
         self.active += 1
         if self.active >= len(self.civs):
             self.active = 0
-
-
-if __name__ == '__main__':
-    parser = ArgumentParser()
-    parser.add_argument("board", nargs=2, type=int)
-    parser.add_argument("--screen", nargs=2, type=int, default=(1280, 720))
-    parser.add_argument("--rate", type=int, default=30)
-    args = parser.parse_args()
-    game = Game(args.board, civs=['France', 'England', 'America'])
-    RenderGame(game, screen=args.screen, rate=args.rate).render()

@@ -1,0 +1,15 @@
+#! /usr/bin/env python
+
+from argparse import ArgumentParser
+from pyciv.game import Game
+from pyciv.render import RenderGame
+
+if __name__ == '__main__':
+    parser = ArgumentParser()
+    parser.add_argument("board", nargs=2, type=int)
+    parser.add_argument("--screen", nargs=2, type=int, default=(1280, 720))
+    parser.add_argument("--rate", type=int, default=30)
+    parser.add_argument("--mapconfig", default="map.ini")
+    args = parser.parse_args()
+    game = Game(args.board, civs=['France', 'England', 'America'], map_config_file=args.mapconfig)
+    RenderGame(game, screen=args.screen, rate=args.rate).render()

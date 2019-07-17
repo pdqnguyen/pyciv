@@ -1,0 +1,1 @@
+YIELD_TYPES = ['food', 'production', 'gold', 'culture', 'faith', 'science']

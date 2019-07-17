@@ -5,9 +5,9 @@ import math
 import sys
 from matplotlib.colors import to_rgb
 
-from bases import BASE_COLORS
-from features import FEATURE_COLORS
-from civilizations import CIV_COLORS
+from .bases import BASE_COLORS
+from .features import FEATURE_COLORS
+from .civilizations import CIV_COLORS
 
 
 SQRT3 = math.sqrt(3)
