@@ -146,7 +146,7 @@ class RenderGame(object):
                         pressed = True
                 polygons = grid.draw()
                 surface.blit(grid, (0, 0))
-                self.show_turn(surface, (1000, 0), font)
+                self.show_turn(surface, font)
                 self.show_button(surface, (0, 0), "End turn", font, pressed)
                 self.show_tile_info(surface, polygons, font)
                 pg.display.update()
@@ -201,8 +201,10 @@ class RenderGame(object):
         surface.blit(button, rect)
         return rect
 
-    def show_turn(self, surface, pos, font):
+    def show_turn(self, surface, font):
         text = "Turn: {}\nActive civ: {}".format(self.game.turn, self.game.active_civ())
+        textwidth = font.size(text)[0]
+        pos = (self.screen[0] - max(font.size(line)[0] for line in text.splitlines()), 0)
         self.show_textbox(surface, pos, text, font)
         return
 

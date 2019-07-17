@@ -118,13 +118,8 @@ class Tile(object):
             for y in YIELD_TYPES:
                 out[y] += RESOURCE_YIELDS[r].get(y, 0)
         if self.city:
-            for y, val in out.items():
-                if y == 'science':
-                    val += self.city.p
-                for b in self.city.buildings:
-                    val += getattr(b, y, 0)
-                    mod = y + '_modifier'
-                    val *= getattr(b, mod, 1)
+            for y in YIELD_TYPES:
+                out[y] += self.city.yields.get(y, 0)
         return out
 
     def print_yields(self):

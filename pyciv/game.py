@@ -41,6 +41,7 @@ class Game(object):
                     if not nearby_cities:
                         name = 'city'
                         self.board.add_city(tile1.x, tile1.y, name, civ, capital=True)
+                        tile1.city.begin_production('monument')
                         cities.append(name)
                 i += 1
 
@@ -48,6 +49,9 @@ class Game(object):
         return self.civs[self.active]
 
     def next_turn(self):
+        for tile in self.board:
+            if tile.city:
+                tile.city.update_production(tile.yields['production'])
         self.turn += 1
         self.active += 1
         if self.active >= len(self.civs):
