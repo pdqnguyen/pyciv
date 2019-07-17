@@ -114,9 +114,11 @@ class Tile(object):
         out = {y: 0 for y in YIELD_TYPES}
         out.update(**BASE_YIELDS[self.base])
         for f in self.features:
-            out.update(**FEATURE_YIELDS[f])
+            for y in YIELD_TYPES:
+                out[y] += FEATURE_YIELDS[f].get(y, 0)
         for r in self.resources:
-            out.update(**RESOURCE_YIELDS[r])
+            for y in YIELD_TYPES:
+                out[y] += RESOURCE_YIELDS[r].get(y, 0)
         if self.city:
             for y, val in out.items():
                 if y == 'science':
