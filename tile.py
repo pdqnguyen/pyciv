@@ -73,8 +73,8 @@ class Tile(object):
         del self.features[self.features.index(feature)]
         self.moves -= FEATURE_MOVES[feature]
 
-    def add_city(self, name, civ):
-        self.city = City(self.x, self.y, name, civ)
+    def add_city(self, name, civ, **kwargs):
+        self.city = City(self.x, self.y, name, civ, **kwargs)
         self.civ = civ
         self.features = []
 
@@ -251,9 +251,9 @@ class TileArray(np.ndarray):
                     out.append((new_x, new_y))
         return out
 
-    def add_city(self, x, y, name, civ):
+    def add_city(self, x, y, name, civ, capital=False):
         tile = self[x, y]
-        tile.add_city(name, civ)
+        tile.add_city(name, civ, buildings=(['palace'] if capital else []))
         for neighbor in self.get_neighbors(tile):
             neighbor.set_civ(civ)
 

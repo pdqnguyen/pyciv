@@ -166,6 +166,11 @@ class RenderGame(object):
         yields = tile.print_yields().split("\n")
         yields = [y for y in yields if y]
         lines += yields
+        if tile.city:
+            if tile.city.buildings:
+                lines.append("---")
+                buildings = [b.name for b in tile.city.buildings]
+                lines += buildings
         lines.append("---")
         lines.append(", ".join([str(tile.x), str(tile.y)]))
         return lines

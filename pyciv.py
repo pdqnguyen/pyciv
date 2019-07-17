@@ -49,7 +49,7 @@ class Game(object):
                     open_tiles = [t for t in open_tiles if t not in nearby_tiles]
                     if not nearby_cities:
                         name = 'city'
-                        self.board.add_city(tile1.x, tile1.y, name, civ)
+                        self.board.add_city(tile1.x, tile1.y, name, civ, capital=True)
                         cities.append(name)
                 i += 1
 
