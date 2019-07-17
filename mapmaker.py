@@ -225,7 +225,7 @@ def make(shape):
     n_isls = int(round(n_isls))
     avg_cont_size = int(base_config['land_ratio'] * board.size / n_conts)
     std_cont_size = std_num_continents * avg_cont_size
-    min_cont_size = 0.1 * avg_cont_size
+    min_cont_size = int(0.1 * avg_cont_size)
     for _ in range(MAX_ITER):
         cont_size = random.normalvariate(
             avg_cont_size, std_cont_size)
