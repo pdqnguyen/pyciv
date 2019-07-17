@@ -4,6 +4,7 @@ from argparse import ArgumentParser
 import mapmaker
 from render import RenderGame
 from tile import City
+from utils import distance
 import random
 
 MAX_ITER = 1000
@@ -33,15 +34,7 @@ class Game(object):
                     nearby_cities = False
                     nearby_tiles = []
                     for tile2 in open_tiles:
-                        dx = tile2.x - tile1.x
-                        dy = tile2.y - tile1.y
-                        adx = abs(dx)
-                        ady = abs(dy)
-                        if ((dx < 0) ^ ((tile1.y & 1) == 1)):
-                            adx = max(0, adx - (ady + 1) / 2)
-                        else:
-                            adx = max(0, adx - (ady) / 2)
-                        d = adx + ady
+                        d = distance(tile1, tile2)
                         if d < MIN_CITY_SEP:
                             nearby_tiles.append(tile2)
                             if tile2.city:
