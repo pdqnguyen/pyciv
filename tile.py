@@ -214,13 +214,15 @@ class TileArray(np.ndarray):
         out = []
         for i in range(6):
             new_x, new_y = tile.neighbor(i)
-            if (
-                    new_x >= 0 and
-                    new_x < self.shape[0] and
-                    new_y >= 0 and
-                    new_y < self.shape[1]
-            ):
-                out.append(self[new_x, new_y])
+            if new_x < 0:
+                new_x = self.shape[0] - 1
+            elif new_x >= self.shape[0]:
+                new_x = 0
+            if new_y < 0:
+                new_y = self.shape[1] - 1
+            elif new_y >= self.shape[1]:
+                new_y = 0
+            out.append(self[new_x, new_y])
         return out
 
     def search_neighbors(

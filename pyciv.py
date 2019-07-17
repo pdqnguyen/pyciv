@@ -35,10 +35,10 @@ class Game(object):
                     nearby_cities = False
                     nearby_tiles = []
                     for tile2 in open_tiles:
-                        d = distance(tile1, tile2)
+                        d = distance(tile1, tile2, self.shape[0])
                         if d < MIN_CITY_SEP:
                             nearby_tiles.append(tile2)
-                            if tile2.city:
+                            if tile2.civ:
                                 nearby_cities = True
                     open_tiles = [t for t in open_tiles if t not in nearby_tiles]
                     if not nearby_cities:
