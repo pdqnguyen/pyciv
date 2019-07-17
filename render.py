@@ -209,20 +209,31 @@ class RenderGame(object):
                 self.game.next_turn()
         else:
             color = pg.Color(0, 0, 0)
-        self.show_textbox(surface, rect, text, font, color=color)
-        return rect
-
-    def show_turn(self, surface, pos, font):
-        text = "Turn: {}".format(self.game.turn)
-        box = (font.size(text)[0], font.get_height())
-        rect = pg.Rect((pos[0], pos[1], box[0], box[1]))
-        self.show_textbox(surface, rect, text, font)
-        return rect
-
-    def show_textbox(self, surface, rect, text, font, color=None):
-        if color is None:
-            color = pg.Color(0, 0, 0)
         button = font.render(text, 1, (255, 255, 255))
         pg.draw.rect(surface, color, rect)
         surface.blit(button, rect)
+        return rect
+
+    def show_turn(self, surface, pos, font):
+        text = "Turn: {}\nActive civ: {}".format(self.game.turn, self.game.active_civ())
+        self.show_textbox(surface, pos, text, font)
+        return
+
+    def show_textbox(self, surface, pos, text, font, color=None):
+        lines = text.splitlines()
+        box = (
+            max([font.size(line)[0] for line in lines]),
+            font.get_height() * len(lines)
+        )
+        tile_text_bg_rect = pg.Rect(
+            pos[0], pos[1], box[0], box[1])
+        tile_text_bg = pg.draw.rect(
+            surface, pg.Color(0, 0, 0), tile_text_bg_rect)
+        for i, line in enumerate(lines):
+            tile_text = font.render(
+                line, 1, (255, 255, 255))
+            tile_text_rect = tile_text.get_rect()
+            text_pos = (pos[0], pos[1] + font.get_height() * i)
+            tile_text_rect.topleft = text_pos
+            surface.blit(tile_text, tile_text_rect)
         return

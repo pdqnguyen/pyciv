@@ -18,6 +18,7 @@ class Game(object):
         self._init_map()
         self._init_cities()
         self.turn = 0
+        self.active = 0
 
     def _init_map(self):
         self.board = mapmaker.make(self.shape)
@@ -46,8 +47,14 @@ class Game(object):
                         cities.append(name)
                 i += 1
 
+    def active_civ(self):
+        return self.civs[self.active]
+
     def next_turn(self):
         self.turn += 1
+        self.active += 1
+        if self.active >= len(self.civs):
+            self.active = 0
 
 
 if __name__ == '__main__':
