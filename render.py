@@ -148,13 +148,13 @@ class RenderGame(object):
                 surface.blit(grid, (0, 0))
                 self.show_turn(surface, (1000, 0), font)
                 self.show_button(surface, (0, 0), "End turn", font, pressed)
-                self.show_tooltip(surface, polygons, font)
+                self.show_tile_info(surface, polygons, font)
                 pg.display.update()
                 clock.tick(self.rate)
         finally:
             pg.quit()
 
-    def tile_tooltip(self, tile):
+    def tile_info_text(self, tile):
         lines = []
         if tile.city:
             lines.append("{} ({})".format(tile.city.name, tile.city.p))
@@ -173,29 +173,16 @@ class RenderGame(object):
                 lines += buildings
         lines.append("---")
         lines.append(", ".join([str(tile.x), str(tile.y)]))
-        return lines
+        text = "\n".join(lines)
+        return text
 
-    def show_tooltip(self, surface, polygons, font):
+    def show_tile_info(self, surface, polygons, font):
         fontheight = font.get_height()
         mouse = pg.mouse.get_pos()
         for t, p in polygons:
             if p.inflate(-3, -3).collidepoint(mouse):
-                lines = self.tile_tooltip(t)
-                box = (
-                    max([font.size(line)[0] for line in lines]),
-                    fontheight * len(lines)
-                )
-                tile_text_bg_rect = pg.Rect(
-                    mouse[0], mouse[1], box[0], box[1])
-                tile_text_bg = pg.draw.rect(
-                    surface, pg.Color(0, 0, 0), tile_text_bg_rect)
-                for i, line in enumerate(lines):
-                    tile_text = font.render(
-                        line, 1, (255, 255, 255))
-                    tile_text_rect = tile_text.get_rect()
-                    text_pos = (mouse[0], mouse[1] + fontheight * i)
-                    tile_text_rect.topleft = text_pos
-                    surface.blit(tile_text, tile_text_rect)
+                text = self.tile_info_text(t)
+                self.show_textbox(surface, mouse, text, font)
         return
 
     def show_button(self, surface, pos, text, font, pressed):
