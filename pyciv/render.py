@@ -118,7 +118,7 @@ class RenderGrid(pg.Surface):
 
 
 class RenderGame(object):
-    def __init__(self, game, screen=(1280, 720), rate=30, fontsize=24):
+    def __init__(self, game, screen=(1280, 720), rate=30, fontsize=36):
         self.game = game
         self.screen = screen
         self.rate = rate
@@ -133,8 +133,8 @@ class RenderGame(object):
             font = pg.font.SysFont("Trebuchet", self.fontsize)
             clock = pg.time.Clock()
 
-            tile_text = None
             polygons = []
+            active_city = False
 
             while True:
                 pressed = False
@@ -144,15 +144,33 @@ class RenderGame(object):
                         sys.exit()
                     if ev.type == MOUSEBUTTONDOWN:
                         pressed = True
-                polygons = grid.draw()
+                mouse = pg.mouse.get_pos()
+                tile, polygon = self.get_tile(grid, mouse)
                 surface.blit(grid, (0, 0))
                 self.show_turn(surface, font)
                 self.show_button(surface, (0, 0), "End turn", font, pressed)
-                self.show_tile_info(surface, polygons, font)
+                if tile:
+                    self.show_tile_info(surface, tile, mouse, font)
+                # Open city menu
+                if tile and pressed:
+                    if tile.city:
+                        active_city = tile.city
+                        self.show_production_menu(surface, active_city, polygon, font)
+                    else:
+                        active_city = None
+                elif active_city:
+                    self.show_production_menu(surface, active_city, polygon, font)
                 pg.display.update()
                 clock.tick(self.rate)
         finally:
             pg.quit()
+
+    def get_tile(self, grid, mouse):
+        polygons = grid.draw()
+        for t, p in polygons:
+            if p.inflate(-3, -3).collidepoint(mouse):
+                return t, p
+        return None, None
 
     def tile_info_text(self, tile):
         lines = []
@@ -176,14 +194,21 @@ class RenderGame(object):
         text = "\n".join(lines)
         return text
 
-    def show_tile_info(self, surface, polygons, font):
+    def show_tile_info(self, surface, tile, mouse, font):
         fontheight = font.get_height()
-        mouse = pg.mouse.get_pos()
-        for t, p in polygons:
-            if p.inflate(-3, -3).collidepoint(mouse):
-                text = self.tile_info_text(t)
-                self.show_textbox(surface, mouse, text, font)
+        text = self.tile_info_text(tile)
+        self.show_textbox(surface, mouse, text, font)
         return
+
+    def show_production_menu(self, surface, city, polygon, font):
+        text = city.name + " ({})\n".format(city.civ)
+        text += "Choose production:\n"
+        text += "\n".join(city.production_options())
+        lines = text.splitlines()
+        x = self.screen[0] - max(font.size(line)[0] for line in lines)
+        y = self.screen[1] - font.get_height() * len(lines)
+        pos = (x, y)
+        self.show_textbox(surface, pos, text, font)
 
     def show_button(self, surface, pos, text, font, pressed):
         mouse = pg.mouse.get_pos()
@@ -203,7 +228,6 @@ class RenderGame(object):
 
     def show_turn(self, surface, font):
         text = "Turn: {}\nActive civ: {}".format(self.game.turn, self.game.active_civ())
-        textwidth = font.size(text)[0]
         pos = (self.screen[0] - max(font.size(line)[0] for line in text.splitlines()), 0)
         self.show_textbox(surface, pos, text, font)
         return

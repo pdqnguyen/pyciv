@@ -1,5 +1,5 @@
 from . import YIELD_TYPES
-from .buildings import Building
+from .buildings import Building, BUILDINGS
 
 
 class City(object):
@@ -30,6 +30,13 @@ class City(object):
                 self.buildings.append(self.production)
                 self.production = None
                 self.production_progress = 0
+
+    def production_options(self):
+        out = []
+        for k, v in BUILDINGS.items():
+            if not any(k == b.name for b in self.buildings):
+                out.append(k)
+        return out
 
     def grow(self, n=1):
         self.p += n
