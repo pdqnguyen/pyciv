@@ -8,7 +8,8 @@ BUILDINGS = {
             'culture': 1
         },
         'modifiers': {},
-        'cost': {}
+        'cost': {},
+        'require': {}
     },
     'monument': {
         'yields': {
@@ -18,7 +19,32 @@ BUILDINGS = {
         'cost': {
             'production': 30,
             'cost': 100
-        }
+        },
+        'require': {}
+    },
+    'shrine': {
+        'yields': {
+            'faith': 2
+        },
+        'modifiers': {},
+        'cost': {
+            'production': 30,
+            'cost': 100
+        },
+        'require': {}
+    },
+    'granary': {
+        'yields': {
+            'food': 2
+        },
+        'modifiers': {
+            'food': 1.1
+        },
+        'cost': {
+            'production': 50,
+            'cost': 130
+        },
+        'require': {}
     }
 }
 
