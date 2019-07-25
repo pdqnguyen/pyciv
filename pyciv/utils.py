@@ -1,3 +1,5 @@
+from math import ceil
+
 def distance(tile1, tile2, xmax):
     dx1 = tile2.x - tile1.x
     dx2 = tile2.x - (tile1.x + xmax)
@@ -9,5 +11,5 @@ def distance(tile1, tile2, xmax):
         adx = max(0, adx - (ady + 1) / 2)
     else:
         adx = max(0, adx - (ady) / 2)
-    d = adx + ady
+    d = ceil(adx + ady)
     return d
