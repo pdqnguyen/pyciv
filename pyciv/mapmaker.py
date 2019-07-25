@@ -16,6 +16,7 @@ MAX_ITER = 10000
 def get_config(map_config_file=MAP_CONFIG_FILE):
     config = ConfigParser()
     config.read(map_config_file)
+    base_config = {}
     feature_config = {}
     for section in config.sections():
         sub_dict = {}
