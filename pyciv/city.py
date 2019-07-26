@@ -45,7 +45,7 @@ class City(object):
             if self.prod_progress > cost:
                 self.build(self.prod)
                 self.prod = None
-                self.prod_progress -= cost
+                self.prod_progress -= max(self.prod_progress, cost)
 
     def prod_options(self):
         out = []

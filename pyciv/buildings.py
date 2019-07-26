@@ -8,7 +8,10 @@ BUILDINGS = {
             'culture': 1
         },
         'modifiers': {},
-        'cost': {},
+        'cost': {
+            'production': 0,
+            'cost': 0
+        },
         'require': {}
     },
     'monument': {

@@ -137,15 +137,26 @@ def menu_data():
     return data
 
 
-def city_menu_data(city): 
+def city_menu_data(city):
+    prod_current = 'Production - {} ({}/{})'.format(
+        city.prod.name,
+        city.prod_progress,
+        city.prod.cost['production']
+    ) if city.prod else 'Production'
+    prod_options = city.prod_options() if city.prod_options() else ['None']
+    buildings = [b.name for b in city.buildings]
     data = (
         city.name,
         (
-            'Production',
-                (
-                    'Choose production',
-                    *city.prod_options()
-                )
+            prod_current,
+            (
+                'Choose production',
+                *prod_options
+            ),
+            (
+                'Buildings',
+                *buildings
+            )
         ),
         'End turn',
         'Close menu',
@@ -154,15 +165,16 @@ def city_menu_data(city):
 
 
 def handle_menu(e, game, tile, city, civ):
-    print('Menu event: %s.%d: %s' % (e.name,e.item_id,e.text))
-    if e.name == 'Choose production':
-        city.begin_prod(e.text)
-    if e.text == 'Quit game':
-        quit()
-    elif e.text == 'End turn':
-        game.end_turn()
+    #print('Menu event: %s --- %d: %s' % (e.name, e.item_id, e.text))
+    if e.name == 'Choose production...':
+        if e.text != 'None':
+            city.begin_prod(e.text)
     elif e.text == 'Close menu':
         return
+    elif e.text == 'End turn':
+        game.end_turn()
+    elif e.text == 'Quit game':
+        quit()
 
 
 class RenderGame(object):
@@ -188,6 +200,8 @@ class RenderGame(object):
                 if self.game.active_civ().name not in self.game.humans:
                     self.game.cpu_turn()
                 # render loop
+                active_tile = None
+                active_city = None
                 while True:
                     if self.game.active_civ().name not in self.game.humans:
                         break
@@ -203,13 +217,15 @@ class RenderGame(object):
                         if ev.type == MOUSEBUTTONDOWN:
                             pressed = True
                         if ev.type == MOUSEBUTTONUP:
-                            if city:
-                                PopupMenu(city_menu_data(city))#, pos=(0, 0))
+                            if city and city.tiles[0] == tile:
+                                active_tile = tile
+                                active_city = city
+                                PopupMenu(city_menu_data(active_city))#, pos=(0, 0))
                             else:
-                                PopupMenu(menu_data())
+                                pass #PopupMenu(menu_data())
                         elif ev.type == USEREVENT:
                             if ev.code == 'MENU':
-                                handle_menu(ev, self.game, tile, city, civ)
+                                handle_menu(ev, self.game, active_tile, active_city, civ)
                         elif ev.type == KEYDOWN:
                             keypress = pg.key.get_pressed()
                             if ev.key == pg.K_c and pg.key.get_mods() & pg.KMOD_CTRL:
