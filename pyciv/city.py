@@ -45,7 +45,7 @@ class City(object):
             if self.prod_progress > cost:
                 self.build(self.prod)
                 self.prod = None
-                self.prod_progress -= max(self.prod_progress, cost)
+                self.prod_progress -= cost
 
     def prod_options(self):
         out = []
@@ -55,28 +55,27 @@ class City(object):
         return out
 
     def update_pp(self):
-        self.pp_progress += self.yields['food']
-        while True:
-            n = self.pp - 1
-            cost = 15 + 8 * n + n ** 1.5
-            if self.pp_progress > cost:
-                self.grow(1)
-                self.pp_progress -= cost
-            else:
-                break
+        surplus = self.yields['food'] - (2 * self.pp)
+        self.pp_progress += surplus
+        n = self.pp - 1
+        cost = 15 + 8 * n + n ** 1.5
+        if self.pp_progress > cost:
+            self.grow(1)
+            self.pp_progress -= cost
 
     @property
     def yields(self):
+        pp_scale = min(1, self.pp / len(self.tiles))
         out = {y: 0 for y in YIELD_TYPES}
         for y in YIELD_TYPES:
             for tile in self:
-                out[y] += tile.yields.get(y, 0)
+                out[y] += tile.yields.get(y, 0) * pp_scale
         for y, val in out.items():
             mod = 1
             if y == 'science':
                 val += self.pp
             for b in self.buildings:
                 val += b.yields.get(y, 0)
-                mod += b.modifiers.get(y, 1)
+                mod *= b.modifiers.get(y, 1)
             out[y] += val * mod
         return out
