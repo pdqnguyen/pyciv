@@ -138,7 +138,7 @@ def menu_data():
 
 
 def city_menu_data(city):
-    prod_current = 'Production - {} ({}/{})'.format(
+    prod_current = 'Production - {} ({:.1f}/{})'.format(
         city.prod.name,
         city.prod_progress,
         city.prod.cost['production']
