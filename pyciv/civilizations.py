@@ -30,3 +30,8 @@ class Civilization(object):
         if kwargs.get('capital', False):
             self.capital = city
         return city
+
+    def update(self):
+        for city in self:
+            city.update_prod()
+            city.update_pp()

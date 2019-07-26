@@ -72,10 +72,7 @@ class Game(object):
         return self.civs[self.active]
 
     def end_turn(self):
-        for civ in self.civs:
-            for city in civ:
-                city.update_prod()
-                city.update_pp()
+        self.active_civ().update()
         self.turn += 1
         self.active += 1
         if self.active >= len(self.civs):
