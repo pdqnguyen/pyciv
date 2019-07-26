@@ -27,7 +27,8 @@ class Game(object):
             except:
                 continue
             else:
-                break
+                return
+        raise RuntimeError("failed to generate map")
 
     def _init_cities(self):
         open_tiles = [tile for tile in self.board]
