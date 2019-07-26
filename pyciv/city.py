@@ -3,51 +3,78 @@ from .buildings import Building, BUILDINGS
 
 
 class City(object):
-    def __init__(self, x, y, name, civ, p=1, buildings=['palace']):
-        self.x = x
-        self.y = y
+    def __init__(self, tiles, name, civ, domain=[], pp=1, buildings=[], capital=False):
+        self.tiles = tiles
+        self.x = self.tiles[0].x
+        self.y = self.tiles[1].y
         self.name = name
         self.civ = civ
-        self.p = p
-        self.production = None
-        self.production_progress = 0
-        self._init_buildings(buildings)
+        self.domain = domain
+        self.pp = pp
+        self.pp_progress = 0
+        self.prod = None
+        self.prod_progress = 0
+        self._init_buildings(buildings=buildings, capital=capital)
+        self.capital = capital
 
-    def _init_buildings(self, buildings=[]):
-        self.buildings = []
-        for b in buildings:
-            self.buildings.append(Building(b))
+    def __iter__(self):
+        for tile in self.tiles:
+            yield tile
 
-    def begin_production(self, building):
-        self.production = Building(building)
-        self.production_progress = 0
+    def _init_buildings(self, buildings=[], capital=False):
+        if capital and 'palace' not in buildings:
+            buildings.append('palace')
+        self.buildings = [Building(b) for b in buildings]
 
-    def update_production(self, tile_production):
-        yd = tile_production + self.yields['production']
-        self.production_progress += yd
-        if self.production:
-            if self.production_progress > self.production.cost['production']:
-                self.buildings.append(self.production)
-                self.production = None
-                self.production_progress = 0
+    def build(self, *args):
+        for building in args:
+            self.buildings.append(building)
 
-    def production_options(self):
+    def grow(self, n=1):
+        self.pp += n
+
+    def begin_prod(self, building):
+        print("Beginning production of " + building)
+        self.prod = Building(building)
+        self.prod_progress = 0
+
+    def update_prod(self):
+        self.prod_progress += self.yields['production']
+        if self.prod:
+            cost = self.prod.cost['production']
+            if self.prod_progress > cost:
+                self.build(self.prod)
+                self.prod = None
+                self.prod_progress -= cost
+
+    def prod_options(self):
         out = []
         for k, v in BUILDINGS.items():
             if not any(k == b.name for b in self.buildings):
                 out.append(k)
         return out
 
-    def grow(self, n=1):
-        self.p += n
+    def update_pp(self):
+        self.pp_progress += self.yields['food']
+        while True:
+            n = self.pp - 1
+            cost = 15 + 8 * n + n ** 1.5
+            if self.pp_progress > cost:
+                self.grow(1)
+                self.pp_progress -= cost
+            else:
+                break
 
     @property
     def yields(self):
         out = {y: 0 for y in YIELD_TYPES}
+        for y in YIELD_TYPES:
+            for tile in self:
+                out[y] += tile.yields.get(y, 0)
         for y, val in out.items():
             mod = 1
             if y == 'science':
-                val += self.p
+                val += self.pp
             for b in self.buildings:
                 val += b.yields.get(y, 0)
                 mod += b.modifiers.get(y, 1)

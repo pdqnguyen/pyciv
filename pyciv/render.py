@@ -2,12 +2,14 @@
 
 import pygame as pg
 import math
+import os
 import sys
 from matplotlib.colors import to_rgb
 
 from .bases import BASE_COLORS
 from .features import FEATURE_COLORS
 from .civilizations import CIV_COLORS
+from .menu import PopupMenu
 
 
 SQRT3 = math.sqrt(3)
@@ -19,8 +21,9 @@ def colorname2pg(name):
 
 
 class RenderGrid(pg.Surface):
-    def __init__(self, board, screen=(1280, 720)):
+    def __init__(self, board, civs, screen=(1280, 720)):
         self.board = board
+        self.civs = civs
         self.width, self.height = screen
         self.radius = self._radius()
         super(RenderGrid, self).__init__((self.width, self.height))
@@ -30,7 +33,17 @@ class RenderGrid(pg.Surface):
         max_y = self.height / (1.5 * self.board.shape[1] + 0.5)
         return min(max_x, max_y)
 
-    def draw_base(self, tile, x_offset=0, y_offset=0):
+    def _xy_offset(self, tile):
+        # Tile position offsets
+        if tile.y % 2 == 0:
+            x_offset = SQRT3 * self.radius * (tile.x)
+        else:
+            x_offset = SQRT3 * self.radius * (tile.x + 0.5)
+        y_offset = 1.5 * self.radius * (tile.y)
+        return x_offset, y_offset
+
+    def draw_base(self, tile):
+        x_offset, y_offset = self._xy_offset(tile)
         # Hex corner locations
         points = [
             (0.5 * SQRT3 * self.radius, 0),
@@ -49,7 +62,8 @@ class RenderGrid(pg.Surface):
         pg.draw.polygon(self, pg.Color(0, 0, 0), points, 2)
         return poly
 
-    def draw_features(self, tile, x_offset=0, y_offset=0):
+    def draw_features(self, tile):
+        x_offset, y_offset = self._xy_offset(tile)
         color = self._get_feature_color(tile.features[-1])
         circle_pos = (
             int(x_offset + 0.5 * SQRT3 * self.radius),
@@ -59,8 +73,8 @@ class RenderGrid(pg.Surface):
         pg.draw.circle(self, color, circle_pos, circle_r)
         return
 
-    def draw_city(self, tile, x_offset=0, y_offset=0):
-        color = self._get_civ_color(tile.civ)
+    def draw_city(self, tile, color):
+        x_offset, y_offset = self._xy_offset(tile)
         triangle = [
             (x_offset + 0.5 * SQRT3 * self.radius - self.radius / SQRT3, y_offset + 1.5 * self.radius),
             (x_offset + 0.5 * SQRT3 * self.radius + self.radius / SQRT3, y_offset + 1.5 * self.radius),
@@ -69,36 +83,32 @@ class RenderGrid(pg.Surface):
         pg.draw.polygon(self, color, triangle)
         return
 
-    def draw_civ(self, tile, x_offset=0, y_offset=0):
-        color = self._get_civ_color(tile.civ)
-        start_pos = (
-            int(x_offset + 0.5 * self.radius),
-            int(y_offset + 0.5 * self.radius)
-        )
-        end_pos = (
-            int(x_offset + 1.5 * self.radius),
-            int(y_offset + 1.5 * self.radius)
-        )
-        pg.draw.line(self, color, start_pos, end_pos, 4)
+    def draw_civ(self, civ, x_offset=0, y_offset=0):
+        color = self._get_civ_color(civ.name)
+        for city in civ:
+            self.draw_city(city.tiles[0], color)
+            for tile in city:
+                x_offset, y_offset = self._xy_offset(tile)
+                start_pos = (
+                    int(x_offset + 0.5 * self.radius),
+                    int(y_offset + 0.5 * self.radius)
+                )
+                end_pos = (
+                    int(x_offset + 1.5 * self.radius),
+                    int(y_offset + 1.5 * self.radius)
+                )
+                pg.draw.line(self, color, start_pos, end_pos, 4)
         return
 
     def draw(self):
         polygons = []
         for tile in self.board:
-            # Tile position offsets
-            if tile.y % 2 == 0:
-                x_offset = SQRT3 * self.radius * (tile.x)
-            else:
-                x_offset = SQRT3 * self.radius * (tile.x + 0.5)
-            y_offset = 1.5 * self.radius * (tile.y)
-            poly = self.draw_base(tile, x_offset=x_offset, y_offset=y_offset)
-            if tile.features:
-                self.draw_features(tile, x_offset=x_offset, y_offset=y_offset)
-            if tile.city:
-                self.draw_city(tile, x_offset=x_offset, y_offset=y_offset)
-            if tile.civ:
-                self.draw_civ(tile, x_offset=x_offset, y_offset=y_offset)
+            poly = self.draw_base(tile)
             polygons.append((tile, poly))
+            if tile.features:
+                self.draw_features(tile)
+        for civ in self.civs:
+            self.draw_civ(civ)
         return polygons
 
     @staticmethod
@@ -117,51 +127,109 @@ class RenderGrid(pg.Surface):
         return colorname2pg(c_color)
 
 
+def menu_data():
+    data = (
+        'Main',
+        'End turn',
+        'Close menu',
+        'Quit game',
+    )
+    return data
+
+
+def city_menu_data(city): 
+    data = (
+        city.name,
+        (
+            'Production',
+                (
+                    'Choose production',
+                    *city.prod_options()
+                )
+        ),
+        'End turn',
+        'Close menu',
+    )
+    return data
+
+
+def handle_menu(e, game, tile, city, civ):
+    print('Menu event: %s.%d: %s' % (e.name,e.item_id,e.text))
+    if e.name == 'Choose production':
+        city.begin_prod(e.text)
+    if e.text == 'Quit game':
+        quit()
+    elif e.text == 'End turn':
+        game.end_turn()
+    elif e.text == 'Close menu':
+        return
+
+
 class RenderGame(object):
     def __init__(self, game, screen=(1280, 720), rate=30, fontsize=36):
         self.game = game
         self.screen = screen
         self.rate = rate
         self.fontsize = fontsize
+        self.active_city = False
 
     def render(self):
-        from pygame.locals import QUIT, MOUSEBUTTONDOWN
-        grid = RenderGrid(self.game.board, screen=self.screen)
+        os.environ['SDL_VIDEO_WINDOW_POS'] = '0,0'
+        from pygame.locals import QUIT, KEYDOWN, MOUSEBUTTONDOWN, MOUSEBUTTONUP, USEREVENT
+        grid = RenderGrid(self.game.board, self.game.civs, screen=self.screen)
         try:
             pg.init()
             surface = pg.display.set_mode(self.screen, 1)
             font = pg.font.SysFont("Trebuchet", self.fontsize)
             clock = pg.time.Clock()
 
-            polygons = []
-            active_city = False
-
+            # game loop
             while True:
-                pressed = False
-                for ev in pg.event.get():
-                    if ev.type == QUIT:
-                        pg.quit()
-                        sys.exit()
-                    if ev.type == MOUSEBUTTONDOWN:
-                        pressed = True
-                mouse = pg.mouse.get_pos()
-                tile, polygon = self.get_tile(grid, mouse)
-                surface.blit(grid, (0, 0))
-                self.show_turn(surface, font)
-                self.show_button(surface, (0, 0), "End turn", font, pressed)
-                if tile:
-                    self.show_tile_info(surface, tile, mouse, font)
-                # Open city menu
-                if tile and pressed:
-                    if tile.city:
-                        active_city = tile.city
-                        self.show_production_menu(surface, active_city, polygon, font)
-                    else:
-                        active_city = None
-                elif active_city:
-                    self.show_production_menu(surface, active_city, polygon, font)
-                pg.display.update()
-                clock.tick(self.rate)
+                if self.game.active_civ().name not in self.game.humans:
+                    self.game.cpu_turn()
+                # render loop
+                while True:
+                    if self.game.active_civ().name not in self.game.humans:
+                        break
+                    mouse = pg.mouse.get_pos()
+                    tile, polygon = self.get_tile(grid, mouse)
+                    city = self.game.get_city(tile)
+                    civ = self.game.get_civ(tile)
+                    pressed = False
+                    for ev in pg.event.get():
+                        if ev.type == QUIT:
+                            pg.quit()
+                            sys.exit()
+                        if ev.type == MOUSEBUTTONDOWN:
+                            pressed = True
+                        if ev.type == MOUSEBUTTONUP:
+                            if city:
+                                PopupMenu(city_menu_data(city))#, pos=(0, 0))
+                            else:
+                                PopupMenu(menu_data())
+                        elif ev.type == USEREVENT:
+                            if ev.code == 'MENU':
+                                handle_menu(ev, self.game, tile, city, civ)
+                        elif ev.type == KEYDOWN:
+                            keypress = pg.key.get_pressed()
+                            if ev.key == pg.K_c and pg.key.get_mods() & pg.KMOD_CTRL:
+                                raise KeyboardInterrupt
+                            elif ev.key == pg.K_RETURN and pg.key.get_mods() & pg.KMOD_SHIFT:
+                                self.game.end_turn()
+                    surface.blit(grid, (0, 0))
+                    self.show_turn(surface, font)
+                    self.show_button(surface, (0, 0), "End turn", font, pressed)
+                    if tile:
+                        self.show_tile_info(surface, tile, mouse, font)
+                    # Open city menu
+                    if tile and pressed:
+                        self.active_city = city
+                        if self.active_city:
+                            self.show_production_menu(surface, self.active_city, polygon, font)
+                    elif self.active_city:
+                        self.show_production_menu(surface, self.active_city, polygon, font)
+                    pg.display.update()
+                    clock.tick(self.rate)
         finally:
             pg.quit()
 
@@ -174,20 +242,22 @@ class RenderGame(object):
 
     def tile_info_text(self, tile):
         lines = []
-        if tile.city:
-            lines.append("{} ({})".format(tile.city.name, tile.city.p))
+        city = self.game.get_city(tile)
+        civ = self.game.get_civ(tile)
+        if city:
+            lines.append("{} ({}){}".format(city.name, city.pp, "*" if city.capital else 0))
         header = ", ".join([tile.base] + tile.features)
-        if tile.civ:
-            header += " ({})".format(tile.civ)
+        if civ:
+            header += " ({})".format(civ.name)
         lines.append(header)
         lines.append("---")
         yields = tile.print_yields().split("\n")
         yields = [y for y in yields if y]
         lines += yields
-        if tile.city:
-            if tile.city.buildings:
+        if city:
+            if city.buildings:
                 lines.append("---")
-                buildings = [b.name for b in tile.city.buildings]
+                buildings = [b.name for b in city.buildings]
                 lines += buildings
         lines.append("---")
         lines.append(", ".join([str(tile.x), str(tile.y)]))
@@ -201,9 +271,11 @@ class RenderGame(object):
         return
 
     def show_production_menu(self, surface, city, polygon, font):
-        text = city.name + " ({})\n".format(city.civ)
+        text = city.name + " ({}){}\n".format(city.civ, "*" if city.capital else 0)
+        if city.prod:
+            text += "Current production:\n{}\n".format(city.prod.name)
         text += "Choose production:\n"
-        text += "\n".join(city.production_options())
+        text += "\n".join(city.prod_options())
         lines = text.splitlines()
         x = self.screen[0] - max(font.size(line)[0] for line in lines)
         y = self.screen[1] - font.get_height() * len(lines)
@@ -218,7 +290,7 @@ class RenderGame(object):
         if rect.collidepoint(mouse):
             color = pg.Color(100, 100, 100)
             if pressed:
-                self.game.next_turn()
+                self.game.end_turn()
         else:
             color = pg.Color(0, 0, 0)
         button = font.render(text, 1, (255, 255, 255))
@@ -227,7 +299,7 @@ class RenderGame(object):
         return rect
 
     def show_turn(self, surface, font):
-        text = "Turn: {}\nActive civ: {}".format(self.game.turn, self.game.active_civ())
+        text = "Turn: {}\nActive civ: {}".format(self.game.turn, self.game.active_civ().name)
         pos = (self.screen[0] - max(font.size(line)[0] for line in text.splitlines()), 0)
         self.show_textbox(surface, pos, text, font)
         return

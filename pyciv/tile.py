@@ -5,7 +5,6 @@ from .bases import BASE_YIELDS, BASE_MOVES
 from .features import FEATURE_YIELDS, FEATURE_MOVES
 from .resources import RESOURCE_YIELDS
 from .buildings import Building
-from .city import City
 
 
 class TileYield(object):
@@ -38,12 +37,11 @@ class TileYield(object):
 
 
 class Tile(object):
-    def __init__(self, x, y, base, features=[], civ=None):
+    def __init__(self, x, y, base, features=[]):
         self.x = x
         self.y = y
         self.base = base
         self.features = []
-        self.civ = civ
 
         # Add base and features
         self.set_base(base)
@@ -51,7 +49,6 @@ class Tile(object):
             self.add_feature(feature)
 
         # Initialize other stuff
-        self.city = None
         self.improvements = []
         self.resources = []
 
@@ -67,17 +64,11 @@ class Tile(object):
     def has_feature(self, *features):
         return any(f in self.features for f in features)
 
-    def remove_feature(self, feature):
-        del self.features[self.features.index(feature)]
-        self.moves -= FEATURE_MOVES[feature]
-
-    def add_city(self, name, civ, **kwargs):
-        self.city = City(self.x, self.y, name, civ, **kwargs)
-        self.civ = civ
-        self.features = []
-
-    def remove_city(self):
-        self.city = None
+    def remove_features(self, *features):
+        for feature in features:
+            if feature in self.features:
+                del self.features[self.features.index(feature)]
+                self.moves -= FEATURE_MOVES[feature]
 
     def add_resource(self, resource):
         self.resources.append(resource)
@@ -100,9 +91,6 @@ class Tile(object):
         y = self.y + dy[n]
         return x, y
 
-    def set_civ(self, civ):
-        self.civ = civ
-
     def __repr__(self):
         s = "<tile.Tile at ({x}, {y}), base={base}, n_features={n_features}>".format(**self.__dict__, n_features=self.n_features)
         return s
@@ -117,9 +105,6 @@ class Tile(object):
         for r in self.resources:
             for y in YIELD_TYPES:
                 out[y] += RESOURCE_YIELDS[r].get(y, 0)
-        if self.city:
-            for y in YIELD_TYPES:
-                out[y] += self.city.yields.get(y, 0)
         return out
 
     def print_yields(self):
@@ -214,12 +199,6 @@ class TileArray(np.ndarray):
                 if match_bases and match_features:
                     out.append((new_x, new_y))
         return out
-
-    def add_city(self, x, y, name, civ, capital=False):
-        tile = self[x, y]
-        tile.add_city(name, civ, buildings=(['palace'] if capital else []))
-        for neighbor in self.get_neighbors(tile):
-            neighbor.set_civ(civ)
 
     def __iter__(self):
         for i in range(self.shape[0]):
