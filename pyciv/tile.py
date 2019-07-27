@@ -5,6 +5,7 @@ from .bases import BASE_YIELDS, BASE_MOVES
 from .features import FEATURE_YIELDS, FEATURE_MOVES
 from .resources import RESOURCE_YIELDS
 from .buildings import Building
+from .utils import neighbor
 
 
 class TileYield(object):
@@ -52,6 +53,10 @@ class Tile(object):
         self.improvements = []
         self.resources = []
 
+    @property
+    def pos(self):
+        return self.x, self.y
+
     def set_base(self, base):
         self.base = base
         self.moves = BASE_MOVES[base]
@@ -80,16 +85,8 @@ class Tile(object):
     def n_features(self):
         return len(self.features)
 
-    def neighbor(self, n):
-        if self.y % 2 != 0:
-            dx = [0, 1, 1, 1, 0, -1]
-            dy = [1, 1, 0, -1, -1, 0]
-        else:
-            dx = [-1, 0, 1, 0, -1, -1]
-            dy = [1, 1, 0, -1, -1, 0]
-        x = self.x + dx[n]
-        y = self.y + dy[n]
-        return x, y
+    def neighbor(self, n, xmax):
+        return neighbor(self.pos, n, xmax)
 
     def __repr__(self):
         s = "<tile.Tile at ({x}, {y}), base={base}, n_features={n_features}>".format(**self.__dict__, n_features=self.n_features)
@@ -160,7 +157,7 @@ class TileArray(np.ndarray):
     def get_neighbors(self, tile):
         out = []
         for i in range(6):
-            new_x, new_y = tile.neighbor(i)
+            new_x, new_y = tile.neighbor(i, self.shape[0])
             if new_x < 0:
                 new_x = self.shape[0] - 1
             elif new_x >= self.shape[0]:

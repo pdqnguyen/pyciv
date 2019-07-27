@@ -3,10 +3,8 @@ from .buildings import Building, BUILDINGS
 
 
 class City(object):
-    def __init__(self, tiles, name, civ, domain=[], pp=1, buildings=[], capital=False):
+    def __init__(self, tiles, name, civ=None, domain=[], pp=1, buildings=[], capital=False):
         self.tiles = tiles
-        self.x = self.tiles[0].x
-        self.y = self.tiles[1].y
         self.name = name
         self.civ = civ
         self.domain = domain
@@ -25,6 +23,10 @@ class City(object):
         if capital and 'palace' not in buildings:
             buildings.append('palace')
         self.buildings = [Building(b) for b in buildings]
+
+    @property
+    def pos(self):
+        return self.tiles[0].x, self.tiles[1].y
 
     def build(self, *args):
         for building in args:
