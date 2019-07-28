@@ -155,7 +155,7 @@ def menu_data():
     return data
 
 
-def city_menu_data(city, unit=None):
+def city_menu_data(city, civ, unit=None):
     prod_current = "Production - {} ({:.1f}/{})".format(
         city.prod.name,
         city.prod_progress,
@@ -163,6 +163,7 @@ def city_menu_data(city, unit=None):
     ) if city.prod else "Production"
     prod_options = city.prod_options() if city.prod_options() else ["No production options"]
     buildings = [b.name for b in city.buildings]
+    civ_menu = civ_menu_data(civ)
     unit_menu = (unit_menu_data(unit) if unit else "No unit stationed")
     data = (
         "{} ({})".format(city.name, city.civ),
@@ -177,6 +178,7 @@ def city_menu_data(city, unit=None):
                 *buildings
             )
         ),
+        civ_menu,
         unit_menu,
         "End turn",
         "Close menu",
@@ -184,11 +186,30 @@ def city_menu_data(city, unit=None):
     return data
 
 
-def unit_menu_data(unit):
+def unit_menu_data(unit, civ):
+    civ_menu = civ_menu_data(civ)
     data = (
         "Unit actions ({} moves remaining)".format(unit.moves),
         "{} ({})".format(unit.name, unit._class),
-        "Move"
+        "Move",
+    )
+    for action in unit.actions:
+        data += (action,)
+    data += (civ_menu,)
+    return data
+
+
+def civ_menu_data(civ):
+    yields_menu = ("Yields",)
+    totals_menu = ("Totals",)
+    for k, v in civ.yields.items():
+        yields_menu += ("{}: {:.1f}".format(k, v),)
+    for k, v in civ.totals.items():
+        totals_menu += ("{}: {:.1f}".format(k, v),)
+    data = (
+        "Civilization menu",
+        yields_menu,
+        totals_menu
     )
     return data
 
@@ -199,8 +220,7 @@ def handle_menu(e, game, tile, city, civ):
         if e.text != "No production options":
             city.begin_prod(e.text)
     elif "Unit actions" in e.name:
-        if e.text == "Move":
-            return 'move'
+        return e.text.lower()
     elif e.text == "Close menu":
         return
     elif e.text == "End turn":
@@ -210,7 +230,7 @@ def handle_menu(e, game, tile, city, civ):
 
 
 class RenderGame(object):
-    def __init__(self, game, screen=(1280, 720), rate=30, fontsize=36):
+    def __init__(self, game, screen=(1920, 1080), rate=30, fontsize=36):
         self.game = game
         self.screen = screen
         self.rate = rate
@@ -230,6 +250,8 @@ class RenderGame(object):
             while True:
                 if self.game.active_civ().name not in self.game.humans:
                     self.game.cpu_turn()
+                for civ in self.game.civs:
+                    print(civ.name, civ.science, civ.culture)
                 # render loop
                 active_tile = None
                 active_unit = None
@@ -245,6 +267,8 @@ class RenderGame(object):
                     unit = self.game.get_unit(tile)
                     city = self.game.get_city(tile)
                     civ = self.game.get_civ(tile)
+                    if unit and not civ:
+                        civ = self.game.find_civ(unit.civ)
                     unit_selected = (unit and unit.pos == tile.pos and unit.civ == active_civ)
                     city_selected = (city and city.tiles[0] == tile and city.civ == active_civ)
                     pressed = False
@@ -265,16 +289,19 @@ class RenderGame(object):
                                 active_city = city
                                 if unit_selected:
                                     active_unit = unit
-                                PopupMenu(city_menu_data(active_city, unit=active_unit), pos=(0, 0))
+                                PopupMenu(city_menu_data(active_city, civ, unit=active_unit), pos=(0, 0))
                             elif unit_selected:
                                 active_unit = unit
-                                PopupMenu(unit_menu_data(active_unit))
+                                PopupMenu(unit_menu_data(active_unit, civ))
                             else:
                                 pass #PopupMenu(menu_data())
                         elif ev.type == USEREVENT:
                             if ev.code == 'MENU':
                                 menu_selection = handle_menu(ev, self.game, active_tile, active_city, civ)
-                                print(menu_selection)
+                                if menu_selection == 'settle':
+                                    active_unit.settle(self.game)
+                                    active_unit = None
+                                    menu_selection = None
                         elif ev.type == KEYDOWN:
                             keypress = pg.key.get_pressed()
                             if ev.key == pg.K_c and pg.key.get_mods() & pg.KMOD_CTRL:
@@ -286,13 +313,13 @@ class RenderGame(object):
                     self.show_button(surface, (0, 0), "End turn", font, pressed)
                     if tile:
                         self.show_tile_info(surface, tile, mouse, font)
-                    # Open city menu
-                    if tile and pressed:
-                        active_city = city
-                        if active_city:
-                            self.show_production_menu(surface, active_city, polygon, font)
-                    elif active_city:
-                        self.show_production_menu(surface, active_city, polygon, font)
+                    ## Open city menu
+                    #if tile and pressed:
+                    #    active_city = city
+                    #    if active_city:
+                    #        self.show_production_menu(surface, active_city, polygon, font)
+                    #elif active_city:
+                    #    self.show_production_menu(surface, active_city, polygon, font)
                     pg.display.update()
                     clock.tick(self.rate)
         finally:

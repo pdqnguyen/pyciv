@@ -50,23 +50,21 @@ class Game(object):
                     if not nearby_cities:
                         city_name = 'city' + civutils.random_str(8)
                         unit_name = 'unit' + civutils.random_str(8)
-                        city = self.add_city(tile1, civ, city_name, capital=True)
+                        #city = self.add_city(tile1, civ, city_name, capital=True)
                         unit = self.add_unit(tile1, civ, unit_name, 'settler')
-                        city.begin_prod('monument')
-                        civ_tiles += city.tiles
+                        #city.begin_prod('monument')
+                        civ_tiles += [tile1]
                         n_cities_total += 1
                         n_cities += 1
                 i += 1
 
-    def add_city(self, tile, civ, name, **kwargs):
-        tiles = [tile] + self.board.get_neighbors(tile)
-        city = civ.add_city(tiles, name, **kwargs)
-        return city
+    def active_civ(self):
+        return self.civs[self.active]
 
-    def add_unit(self, tile, civ, name, _class, **kwargs):
-        civ = self.get_civ(tile)
-        unit = civ.add_unit(tile, name, _class, **kwargs)
-        return unit
+    def find_civ(self, name):
+        for civ in self.civs:
+            if civ.name == name:
+                return civ
 
     def get_civ(self, tile):
         for civ in self.civs:
@@ -86,6 +84,16 @@ class Game(object):
                     if tile.pos == unit.pos:
                         return unit
 
+    def add_city(self, tile, civ, name, **kwargs):
+        tile.remove_features(*['forest', 'rainforest'])
+        tiles = [tile] + self.board.get_neighbors(tile)
+        city = civ.add_city(tiles, name, **kwargs)
+        return city
+
+    def add_unit(self, tile, civ, name, _class, **kwargs):
+        unit = civ.add_unit(tile, name, _class, **kwargs)
+        return unit
+
     def move_unit(self, unit, tile):
         tiles_in_range = civutils.tiles_in_range(unit.pos, 1, self.board.shape[0] - 1)
         if (tile.pos in tiles_in_range) and (unit.moves >= tile.moves):
@@ -103,8 +111,13 @@ class Game(object):
         else:
             print("invalid move")
 
-    def active_civ(self):
-        return self.civs[self.active]
+    def settle(self, unit):
+        tile = self.board[unit.pos]
+        civ = self.find_civ(unit.civ)
+        name = 'city' + civutils.random_str(8)
+        capital = (False if civ.capital else True)
+        self.add_city(tile, civ, name, capital=capital)
+        civ.remove_unit(unit)
 
     def end_turn(self):
         self.active_civ().update()
@@ -117,5 +130,5 @@ class Game(object):
             self.active = 0
 
     def cpu_turn(self):
-        time.sleep(0.5)
+        time.sleep(0.1)
         self.end_turn()

@@ -39,11 +39,10 @@ class CivilianUnit(Unit):
 class SettlerUnit(CivilianUnit):
     def __init__(self, name, **kwargs):
         super(SettlerUnit, self).__init__(name, **kwargs)
-        self.actions = ['settle']
+        self.actions = ['Settle']
 
     def settle(self, game):
-        game.add_city(game.board[self.pos], 'city' + civutils.random_str(8))
-        del self
+        game.settle(self)
 
 class SupportUnit(Unit):
     def __init__(self, name, **kwargs):
