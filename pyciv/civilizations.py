@@ -1,5 +1,6 @@
 from .city import City
 from .units import create_unit
+from . import YIELD_TYPES
 
 CIV_COLORS = {
     'France': 'red',
@@ -14,10 +15,28 @@ class Civilization(object):
         self.cities = []
         self.capital = None
         self.units = []
+        self.science = 0
+        self.culture = 0
+        self.faith = 0
+        self.gold = 0
 
     def __iter__(self):
         for city in self.cities:
             yield city
+
+    @property
+    def yields(self):
+        out = {y: 0 for y in YIELD_TYPES}
+        for y in YIELD_TYPES:
+            for city in self:
+                out[y] += city.yields.get(y, 0)
+        return out
+
+    @property
+    def totals(self):
+        out = {yd: getattr(self, yd, 0) for yd in YIELD_TYPES}
+        out['population'] = sum(city.pp for city in self)
+        return out
 
     def tiles(self):
         tiles = []
@@ -41,7 +60,14 @@ class Civilization(object):
         self.units.append(unit)
         return unit
 
+    def remove_unit(self, unit):
+        del self.units[self.units.index(unit)]
+
     def update(self):
         for city in self:
             city.update_prod()
             city.update_pp()
+            self.science += city.yields['science']
+            self.culture += city.yields['culture']
+            self.faith += city.yields['faith']
+            self.gold += city.yields['gold']
