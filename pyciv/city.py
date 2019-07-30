@@ -1,5 +1,6 @@
 from . import YIELD_TYPES
 from .buildings import Building, BUILDINGS
+from .units import create_unit, Unit, UNITS
 
 
 class City(object):
@@ -28,29 +29,35 @@ class City(object):
     def pos(self):
         return self.tiles[0].x, self.tiles[1].y
 
-    def build(self, *args):
+    def add_building(self, *args):
         for building in args:
             self.buildings.append(building)
 
     def grow(self, n=1):
         self.pp += n
 
-    def begin_prod(self, building):
-        print("Beginning production of " + building)
-        self.prod = Building(building)
+    def begin_prod(self, item):
+        print("Beginning production of " + item)
+        if item in BUILDINGS.keys():
+            self.prod = Building(item)
+        elif item in UNITS.keys():
+            self.prod = create_unit(item, item)
         self.prod_progress = 0
 
     def update_prod(self):
         self.prod_progress += self.yields['production']
         if self.prod:
             cost = self.prod.cost['production']
-            if self.prod_progress > cost:
-                self.build(self.prod)
+            if self.prod_progress >= cost:
+                new_item = self.prod
                 self.prod = None
                 self.prod_progress -= cost
+                return new_item
 
     def prod_options(self):
         out = []
+        for k, v in UNITS.items():
+            out.append(k)
         for k, v in BUILDINGS.items():
             if not any(k == b.name for b in self.buildings):
                 out.append(k)

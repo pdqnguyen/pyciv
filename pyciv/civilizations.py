@@ -63,11 +63,8 @@ class Civilization(object):
     def remove_unit(self, unit):
         del self.units[self.units.index(unit)]
 
-    def update(self):
-        for city in self:
-            city.update_prod()
-            city.update_pp()
-            self.science += city.yields['science']
-            self.culture += city.yields['culture']
-            self.faith += city.yields['faith']
-            self.gold += city.yields['gold']
+    def update_totals(self, yields):
+        self.science += yields['science']
+        self.culture += yields['culture']
+        self.faith += yields['faith']
+        self.gold += yields['gold']

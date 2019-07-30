@@ -155,7 +155,7 @@ def menu_data():
     return data
 
 
-def city_menu_data(city, civ, unit=None):
+def city_menu_data(game, city, civ, unit=None):
     prod_current = "Production - {} ({:.1f}/{})".format(
         city.prod.name,
         city.prod_progress,
@@ -164,7 +164,7 @@ def city_menu_data(city, civ, unit=None):
     prod_options = city.prod_options() if city.prod_options() else ["No production options"]
     buildings = [b.name for b in city.buildings]
     civ_menu = civ_menu_data(civ)
-    unit_menu = (unit_menu_data(unit) if unit else "No unit stationed")
+    unit_menu = (unit_menu_data(game, unit, civ) if unit else "No unit stationed")
     data = (
         "{} ({})".format(city.name, city.civ),
         (
@@ -186,14 +186,13 @@ def city_menu_data(city, civ, unit=None):
     return data
 
 
-def unit_menu_data(unit, civ):
+def unit_menu_data(game, unit, civ):
     civ_menu = civ_menu_data(civ)
     data = (
         "Unit actions ({} moves remaining)".format(unit.moves),
         "{} ({})".format(unit.name, unit._class),
-        "Move",
     )
-    for action in unit.actions:
+    for action in unit.actions(game):
         data += (action,)
     data += (civ_menu,)
     return data
@@ -250,8 +249,6 @@ class RenderGame(object):
             while True:
                 if self.game.active_civ().name not in self.game.humans:
                     self.game.cpu_turn()
-                for civ in self.game.civs:
-                    print(civ.name, civ.science, civ.culture)
                 # render loop
                 active_tile = None
                 active_unit = None
@@ -289,19 +286,26 @@ class RenderGame(object):
                                 active_city = city
                                 if unit_selected:
                                     active_unit = unit
-                                PopupMenu(city_menu_data(active_city, civ, unit=active_unit), pos=(0, 0))
+                                PopupMenu(city_menu_data(self.game, active_city, civ, unit=active_unit), pos=(0, 0))
                             elif unit_selected:
                                 active_unit = unit
-                                PopupMenu(unit_menu_data(active_unit, civ))
+                                PopupMenu(unit_menu_data(self.game, active_unit, civ))
                             else:
                                 pass #PopupMenu(menu_data())
                         elif ev.type == USEREVENT:
                             if ev.code == 'MENU':
-                                menu_selection = handle_menu(ev, self.game, active_tile, active_city, civ)
-                                if menu_selection == 'settle':
+                                menu_selection = handle_menu(
+                                    ev, self.game, active_tile, active_city, civ)
+                                active_unit_class = (active_unit._class if active_unit else None)
+                                active_unit_actions = ([x.lower() for x in active_unit.actions(self.game)] if active_unit else [])
+                                if menu_selection == 'move':
+                                    pass
+                                elif menu_selection == 'settle':
                                     active_unit.settle(self.game)
                                     active_unit = None
                                     menu_selection = None
+                                elif active_unit_class == 'worker' and menu_selection in active_unit_actions:
+                                    self.game.worker_action(self.game.board[active_unit.pos], menu_selection)
                         elif ev.type == KEYDOWN:
                             keypress = pg.key.get_pressed()
                             if ev.key == pg.K_c and pg.key.get_mods() & pg.KMOD_CTRL:
@@ -337,7 +341,7 @@ class RenderGame(object):
         civ = self.game.get_civ(tile)
         if city:
             lines.append("{} ({}){}".format(city.name, city.pp, "*" if city.capital else 0))
-        header = ", ".join([tile.base] + tile.features)
+        header = ", ".join([tile.base] + tile.features + tile.improvements)
         if civ:
             header += " ({})".format(civ.name)
         lines.append(header)

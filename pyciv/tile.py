@@ -81,6 +81,9 @@ class Tile(object):
     def remove_resource(self, resource):
         del self.resources[self.resources.index(resource)]
 
+    def add_improvement(self, improvement):
+        self.improvements.append(improvement)
+
     @property
     def n_features(self):
         return len(self.features)

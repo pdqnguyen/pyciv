@@ -5,6 +5,8 @@ from . import mapmaker
 from .civilizations import Civilization
 from .render import RenderGame
 from . import utils as civutils
+from .buildings import Building
+from .units import Unit
 
 MAX_ITER = 1000
 MIN_CITY_SEP = 4
@@ -14,7 +16,7 @@ class Game(object):
     def __init__(self, shape, civs, leaders, map_config_file=None):
         self.shape = shape
         self.civs = [Civilization(civ, leaders) for civ in civs]
-        self.humans = civs[:2]
+        self.humans = civs[:1]
         self._init_map(map_config_file=map_config_file)
         self._init_cities()
         self.turn = 0
@@ -71,11 +73,15 @@ class Game(object):
             if tile in civ.tiles():
                 return civ
 
-    def get_city(self, tile):
+    def get_city(self, tile, any_tile=False):
         for civ in self.civs:
             for city in civ:
-                if tile == city.tiles[0]:
-                    return city
+                if any_tile:
+                    if tile in city.tiles:
+                        return city
+                else:
+                    if tile == city.tiles[0]:
+                        return city
 
     def get_unit(self, tile):
         for civ in self.civs:
@@ -119,8 +125,34 @@ class Game(object):
         self.add_city(tile, civ, name, capital=capital)
         civ.remove_unit(unit)
 
+    def worker_action(self, tile, action):
+        if action == 'chop':
+            if 'forest' in tile.features:
+                tile.remove_features('forest')
+            elif 'rainforest' in tile.features:
+                tile.remove_features('rainforest')
+            self.get_city(tile, any_tile=True).prod_progress += 20
+        elif action == 'harvest':
+            tile.remove_features(*tile.features)
+            self.get_city(tile, any_tile=True).pp += 20
+        else:
+            tile.add_improvement(action)
+
     def end_turn(self):
-        self.active_civ().update()
+        civ = self.active_civ()
+        for city in civ:
+            new_item = city.update_prod()
+            if new_item:
+                if isinstance(new_item, Building):
+                    city.add_building(new_item)
+                elif isinstance(new_item, Unit):
+                    unit = new_item
+                    for tile in city:
+                        if not self.get_unit(tile):
+                            self.add_unit(tile, civ, unit.name, unit._class)
+                            break
+            city.update_pp()
+            civ.update_totals(city.yields)
         for civ in self.civs:
             for unit in civ.units:
                 unit.reset_moves()
