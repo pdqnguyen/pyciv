@@ -15,6 +15,10 @@ IMPROVEMENT_YIELDS = {
     },
     'lumber mill': {
         'production': 2,
+    },
+    'plantation': {
+        'food': 1,
+        'gold': 1
     }
 }
 
@@ -28,28 +32,27 @@ IMPROVEMENT_BASES = {
 IMPROVEMENT_FEATURES = {
     'farm': [None, 'floodplain', 'hill'],
     'mine': ['hill', 'mountain'],
-    'pasture': [None, 'hill'],
-    'lumber mill': ['forest', 'rainforest']
+    'lumber mill': ['forest', 'rainforest'],
+    'plantation': [None]
 }
 
 
 def improvement_options(tile):
-    out = []
     if tile.improvements:
-        return out
-    elif tile.resources:
-        for resource in tile.resources:
-            imp = RESOURCE_IMPROVEMENTS[resource]
-            if imp not in out:
-                out.append(imp)
-        return out
-    else:
-        for imp in IMPROVEMENTS:
-            bases = IMPROVEMENT_BASES[imp]
-            features = IMPROVEMENT_FEATURES[imp]
-            if tile.base in bases:
-                if None in features and not tile.features:
-                    out.append(imp)
-                elif any(f in features for f in tile.features):
-                    out.append(imp)
-        return out
+        return []
+    out = []
+    base = tile.base
+    features = tile.features
+    resources = tile.resources
+    if resources:
+        if ('forest' not in features) and ('rainforest' not in features):
+            out += [RESOURCE_IMPROVEMENTS[res] for res in resources]
+    if base in ['plains', 'grassland']:
+        if (not features) or features == ['floodplain'] or features == ['hill']:
+            out.append('farm')
+    if base in ['plains', 'grassland', 'desert', 'tundra']:
+        if ('forest' in features) or ('rainforest' in features):
+            out.append('lumber mill')
+        elif ('hill' in features) or ('mountain' in features):
+            out.append('mine')
+    return sorted(set(out))
