@@ -16,7 +16,7 @@ class Game(object):
     def __init__(self, shape, civs, leaders, map_config_file=None):
         self.shape = shape
         self.civs = [Civilization(civ, leaders) for civ in civs]
-        self.humans = civs[:1]
+        self.humans = [] #civs[:1]
         self._init_map(map_config_file=map_config_file)
         self._init_cities()
         self.turn = 0
@@ -139,6 +139,9 @@ class Game(object):
         else:
             tile.add_improvement(action)
         unit.move(unit.pos, 1)
+        unit.builds -= 1
+        if unit.builds == 0:
+            del unit
 
     def end_turn(self):
         civ = self.active_civ()

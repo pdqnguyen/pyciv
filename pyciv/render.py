@@ -188,8 +188,15 @@ def city_menu_data(game, city, civ, unit=None):
 
 def unit_menu_data(game, unit, civ):
     civ_menu = civ_menu_data(civ)
-    data = (
-        "Unit actions ({} moves remaining)".format(unit.moves),
+    if unit._class == 'worker':
+        data = (
+            "Unit actions ({} moves, {} builds remaining)".format(unit.moves, unit.builds),
+        )
+    else:
+        data = (
+            "Unit actions ({} moves remaining)".format(unit.moves),
+        )
+    data += (
         "{} ({})".format(unit.name, unit._class),
     )
     for action in unit.actions(game):

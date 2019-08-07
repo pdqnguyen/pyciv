@@ -83,10 +83,13 @@ class SettlerUnit(Unit):
 
 class WorkerUnit(Unit):
     def __init__(self, name, **kwargs):
+        self.builds = kwargs.get('builds', 4)
         super(WorkerUnit, self).__init__(name, **kwargs)
 
     def actions(self, game):
         out = (['move'] if self.get_moves(game) else [])
+        if self.moves == 0:
+            return out
         tile = game.board[self.pos]
         civ = game.get_civ(tile)
         city = game.get_city(tile)
