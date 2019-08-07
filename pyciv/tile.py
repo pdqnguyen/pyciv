@@ -4,6 +4,7 @@ from . import YIELD_TYPES
 from .bases import BASE_YIELDS, BASE_MOVES
 from .features import FEATURE_YIELDS, FEATURE_MOVES
 from .resources import RESOURCE_YIELDS
+from .improvements import IMPROVEMENT_YIELDS
 from .buildings import Building
 from .utils import neighbor
 
@@ -99,12 +100,13 @@ class Tile(object):
     def yields(self):
         out = {y: 0 for y in YIELD_TYPES}
         out.update(**BASE_YIELDS[self.base])
-        for f in self.features:
-            for y in YIELD_TYPES:
+        for y in YIELD_TYPES:
+            for f in self.features:
                 out[y] += FEATURE_YIELDS[f].get(y, 0)
-        for r in self.resources:
-            for y in YIELD_TYPES:
+            for r in self.resources:
                 out[y] += RESOURCE_YIELDS[r].get(y, 0)
+            for i in self.improvements:
+                out[y] += IMPROVEMENT_YIELDS[i].get(y, 0)
         return out
 
     def print_yields(self):
