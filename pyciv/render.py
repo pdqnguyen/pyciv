@@ -4,6 +4,7 @@ import pygame as pg
 import math
 import os
 import sys
+import time
 from matplotlib.colors import to_rgb
 
 from .bases import BASE_COLORS
@@ -221,7 +222,6 @@ def civ_menu_data(civ):
 
 
 def handle_menu(e, game, tile, city, civ):
-    #print('Menu event: %s --- %d: %s' % (e.name, e.item_id, e.text))
     if e.name == "Choose production...":
         if e.text != "No production options":
             city.begin_prod(e.text)
@@ -261,10 +261,14 @@ class RenderGame(object):
                 active_unit = None
                 active_city = None
                 menu_selection = None
+                i = 0
                 while True:
                     active_civ = self.game.active_civ().name
                     if active_civ not in self.game.humans:
-                        break
+                        if i > 0:
+                            time.sleep(0.1)
+                            break
+                        i += 1
                     polygons = grid.draw()
                     mouse = pg.mouse.get_pos()
                     tile, polygon = self.get_tile(polygons, mouse)

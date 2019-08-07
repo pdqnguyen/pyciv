@@ -173,7 +173,6 @@ class Game(object):
 
     def cpu_turn(self):
         civ = self.active_civ()
-        print(civ.name)
         for unit in civ.units:
             i = 0
             while unit.actions(self) and i < MAX_ITER:
@@ -190,7 +189,6 @@ class Game(object):
                     self.worker_action(unit, action)
                 i += 1
         for city in civ:
-            print(city, getattr(city.prod, 'name', None), city.prod_progress)
             if not city.prod:
                 prod_opts = city.prod_options()
                 if prod_opts:

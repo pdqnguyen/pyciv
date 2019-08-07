@@ -39,7 +39,6 @@ class City(object):
         self.pp += n
 
     def begin_prod(self, item):
-        print("Beginning production of " + item)
         if item in BUILDINGS.keys():
             self.prod = Building(item)
         elif item in UNITS.keys():
@@ -78,7 +77,6 @@ class City(object):
         self.tile_progress += self.yields['culture']
         n = len(self.tiles) - 7
         cost = 10 + (6 * n) ** 1.3
-        print(self.civ, self.name, self.yields['culture'], self.tile_progress)
         if self.tile_progress >= cost:
             nearby_tiles = []
             tiles_wi_5 = civutils.tiles_in_range(self.pos, 5, game.shape)
@@ -91,7 +89,6 @@ class City(object):
                             nearby_tiles.append(new_tile)
             if nearby_tiles:
                 tile = max(nearby_tiles, key=lambda x: sum( x.yields.values()))
-                print(tile)
                 self.tiles.append(tile)
                 self.tile_progress = 0
 
