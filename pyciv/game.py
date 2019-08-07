@@ -53,7 +53,7 @@ class Game(object):
                         city_name = 'city' + civutils.random_str(8)
                         unit_name = 'unit' + civutils.random_str(8)
                         #city = self.add_city(tile1, civ, city_name, capital=True)
-                        unit = self.add_unit(tile1, civ, unit_name, 'warrior', hp=(100 if civ.name == 'France' else 1))
+                        unit = self.add_unit(tile1, civ, unit_name, 'warrior')
                         #city.begin_prod('monument')
                         civ_tiles += [tile1]
                         n_cities_total += 1
