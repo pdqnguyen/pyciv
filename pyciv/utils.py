@@ -3,15 +3,15 @@ import string
 from math import ceil
 
 
-def tiles_in_range(pos, r, xmax):
+def tiles_in_range(pos, r, shape):
     out = [pos]
     seeds = out[:]
     for _ in range(r):
         new_out = []
         for seed in seeds:
             for n in range(6):
-                nb = neighbor(seed, n, xmax)
-                if nb not in out:
+                nb = neighbor(seed, n, shape[0] - 1)
+                if (nb[1] < shape[1]) and (nb not in out):
                     new_out.append(nb)
         out += new_out
         seeds = new_out[:]
