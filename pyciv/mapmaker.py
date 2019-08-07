@@ -6,6 +6,7 @@ from configparser import ConfigParser
 
 from .tile import Tile, TileArray
 from .features import FEATURES
+from .resources import resource_options
 
 MAP_CONFIG_FILE = 'map.ini'
 
@@ -18,6 +19,7 @@ def get_config(map_config_file=MAP_CONFIG_FILE):
     config.read(map_config_file)
     base_config = {}
     feature_config = {}
+    resource_config = {}
     for section in config.sections():
         sub_dict = {}
         for name, value in config.items(section):
@@ -30,9 +32,11 @@ def get_config(map_config_file=MAP_CONFIG_FILE):
                     sub_dict[name] = value
         if section == 'base':
             base_config = sub_dict
+        elif section == 'resources':
+            resource_config = sub_dict
         else:
             feature_config[section] = sub_dict
-    return base_config, feature_config
+    return base_config, feature_config, resource_config
 
 
 def generate_base(y, board):
@@ -210,7 +214,7 @@ def build_feature(board, feature, size, stretch=0):
 def make(shape, map_config_file=None):
     if map_config_file is None:
         map_config_file = MAP_CONFIG_FILE
-    base_config, feature_config = get_config(map_config_file=map_config_file)
+    base_config, feature_config, resource_config = get_config(map_config_file)
     board = TileArray(shape=shape)
     board.fill('ocean')
     conts = []
@@ -272,4 +276,10 @@ def make(shape, map_config_file=None):
             tiles += group
             if len(tiles) >= n_tiles:
                 break
+    for tile in board:
+        res_opts = resource_options(tile)
+        if res_opts:
+            res = random.choice(res_opts)
+            if random.random() < resource_config['coverage']:
+                tile.add_resource(res)
     return board
