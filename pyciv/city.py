@@ -1,6 +1,7 @@
 from . import YIELD_TYPES
 from .buildings import Building, BUILDINGS
 from .units import create_unit, Unit, UNITS
+from . import utils as civutils
 
 
 class City(object):
@@ -13,6 +14,7 @@ class City(object):
         self.pp_progress = 0
         self.prod = None
         self.prod_progress = 0
+        self.tile_progress = 0
         self._init_buildings(buildings=buildings, capital=capital)
         self.capital = capital
 
@@ -45,7 +47,7 @@ class City(object):
         self.prod_progress = 0
 
     def update_prod(self):
-        self.prod_progress += self.yields['production']
+        self.prod_progress += max(0, self.yields['production'])
         if self.prod:
             cost = self.prod.cost['production']
             if self.prod_progress >= cost:
@@ -71,6 +73,27 @@ class City(object):
         if self.pp_progress > cost:
             self.grow(1)
             self.pp_progress -= cost
+
+    def update_tiles(self, game):
+        self.tile_progress += self.yields['culture']
+        n = len(self.tiles) - 7
+        cost = 10 + (6 * n) ** 1.3
+        print(self.civ, self.name, self.yields['culture'], self.tile_progress)
+        if self.tile_progress >= cost:
+            nearby_tiles = []
+            tiles_wi_5 = civutils.tiles_in_range(self.pos, 5, game.shape)
+            for tile in self.tiles:
+                neighbors = civutils.tiles_in_range(tile.pos, 1, game.shape)
+                for nb in neighbors:
+                    if nb in tiles_wi_5:
+                        new_tile = game.board[nb]
+                        if new_tile not in self.tiles:
+                            nearby_tiles.append(new_tile)
+            if nearby_tiles:
+                tile = max(nearby_tiles, key=lambda x: sum( x.yields.values()))
+                print(tile)
+                self.tiles.append(tile)
+                self.tile_progress = 0
 
     @property
     def yields(self):
