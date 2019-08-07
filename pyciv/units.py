@@ -17,6 +17,15 @@ UNITS = {
             'gold': 50,
             'production': 30
         }
+    },
+    'warrior': {
+        'type': 'combat',
+        'movement': 2,
+        'cost': {
+            'gold': 30,
+            'production': 20
+        },
+        'strength': 10
     }
 }
 
@@ -30,15 +39,13 @@ def create_unit(name, unit_class, **kwargs):
 
 
 class Unit:
-    def __init__(self, name, _class=None, pos=None, civ=None, movement=2, cost=None):
+    def __init__(self, name, _class=None, pos=None, civ=None, movement=2, moves=2, cost=None):
         self.name = name
         self._class = _class
         self.pos = pos
         self.civ = civ
-        self.max_hp = 100
-        self.hp = 100
-        self.movement = 10
-        self.moves = 10
+        self.movement = movement
+        self.moves = moves
         self.cost = cost
 
     def move(self, new_pos, moves):
@@ -74,8 +81,7 @@ class SettlerUnit(Unit):
 
     def actions(self, game):
         out = (['move'] if self.get_moves(game) else [])
-        nearby_tiles_xy = civutils.tiles_in_range(self.pos, 3, game.shape)
-        nearby_tiles = [game.board[x, y] for x, y in nearby_tiles_xy]
+        nearby_tiles = civutils.neighbors(self.pos, game.board, r=3)
         if not any(game.get_city(tile) for tile in nearby_tiles):
             out.append('settle')
         return out
@@ -108,4 +114,33 @@ class SupportUnit(Unit):
 
 class CombatUnit(Unit):
     def __init__(self, name, **kwargs):
+        self.max_hp = kwargs.pop('max_hp', 100)
+        self.hp = kwargs.pop('hp', 100)
+        self.strength = kwargs.pop('strength', 10)
         super(CombatUnit, self).__init__(name, **kwargs)
+
+    def actions(self, game):
+        out = (['move'] if self.get_moves(game) else [])
+        out += ['fortify']
+        neighbors = civutils.neighbors(self.pos, game.board)
+        for nb in neighbors:
+            target_civ = getattr(game.get_unit(nb), 'civ', None)
+            if target_civ is not None and target_civ != self.civ:
+                out.append('melee')
+        return out
+
+    def get_targets(self, game):
+        out = []
+        tiles_in_range = civutils.tiles_in_range(self.pos, 1, game.shape)
+        for x, y in tiles_in_range:
+            tile = game.board[x, y]
+            if self.moves >= tile.moves:
+                target_unit = game.get_unit(tile)
+                target_city = game.get_city(tile)
+                if target_unit:
+                    if target_unit.civ != self.civ:
+                        out.append((x, y))
+        return out
+
+    def damage(self, dmg):
+        self.hp -= dmg

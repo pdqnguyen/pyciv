@@ -18,7 +18,7 @@ class Game(object):
         self.civs = [Civilization(civ, leaders) for civ in civs]
         self.humans = civs[:1]
         self._init_map(map_config_file=map_config_file)
-        self._init_cities()
+        self._init_civs()
         self.turn = 0
         self.active = 0
 
@@ -27,12 +27,12 @@ class Game(object):
             try:
                 self.board = mapmaker.make(self.shape, map_config_file=map_config_file)
             except:
-                raise
+                pass
             else:
                 return
         raise RuntimeError("failed to generate map")
 
-    def _init_cities(self):
+    def _init_civs(self):
         open_tiles = [tile for tile in self.board]
         civ_tiles = []
         n_cities_total = 1
@@ -53,7 +53,7 @@ class Game(object):
                         city_name = 'city' + civutils.random_str(8)
                         unit_name = 'unit' + civutils.random_str(8)
                         #city = self.add_city(tile1, civ, city_name, capital=True)
-                        unit = self.add_unit(tile1, civ, unit_name, 'settler')
+                        unit = self.add_unit(tile1, civ, unit_name, 'warrior', hp=(100 if civ.name == 'France' else 1))
                         #city.begin_prod('monument')
                         civ_tiles += [tile1]
                         n_cities_total += 1
@@ -143,6 +143,40 @@ class Game(object):
         if unit.builds == 0:
             del unit
 
+    def combat_action(self, unit, target_tile, action):
+        unit_tile = self.board[unit.pos]
+        target_unit = self.get_unit(target_tile)
+        if target_unit:
+            target_unit_type = type(target_unit).__name__
+            target_civ = self.find_civ(target_unit.civ)
+            civ = self.find_civ(unit.civ)
+            if action == 'melee':
+                if target_unit_type == 'CombatUnit':
+                    strength_diff = unit.strength - target_unit.strength
+                    atk_dmg = 30 * 1.041 ** strength_diff * random.uniform(0.75, 1.25)
+                    def_dmg = 30 * 1.041 ** strength_diff * random.uniform(0.75, 1.25)
+                    unit.damage(atk_dmg)
+                    target_unit.damage(def_dmg)
+                    hp = unit.hp
+                    target_hp = target_unit.hp
+                    if hp > 0 and target_hp <= 0:
+                        print("{} ({}) killed {} ({})".format(unit.name, civ.name, target_unit.name, target_civ.name))
+                        target_civ.remove_unit(target_unit)
+                        self.move_unit(unit, target_tile)
+                    elif hp <= 0 and target_hp > 0:
+                        print("{} ({}) died while attacking {} ({})".format(unit.name, civ.name, target_unit.name, target_civ.name))
+                        civ.remove_unit(unit)
+                    elif hp <= 0 and target_hp <= 0:
+                        print("{} ({}) and {} ({}) died fighting".format(unit.name, civ.name, target_unit.name, target_civ.name))
+                        civ.remove_unit(unit)
+                        target_civ.remove_unit(target_unit)
+                    else:
+                        self.move_unit(unit, unit_tile)
+                elif target_unit_type in ['WorkerUnit', 'SettlerUnit']:
+                    print("{} ({}) killed {} ({})".format(unit.name, civ.name, target_unit.name, target_civ.name))
+                    civ.remove_unit(target_unit)
+                    self.move_unit(unit, target_tile)
+
     def end_turn(self):
         civ = self.active_civ()
         for city in civ:
@@ -185,6 +219,11 @@ class Game(object):
                 elif action == 'settle':
                     self.settle(unit)
                     break
+                elif action == 'melee':
+                    targets = unit.get_targets(self)
+                    if targets:
+                        target = self.board[random.choice(targets)]
+                        self.combat_action(unit, target, 'melee')
                 elif unit._class == 'worker':
                     self.worker_action(unit, action)
                 i += 1

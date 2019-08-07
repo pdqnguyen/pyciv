@@ -292,6 +292,11 @@ class RenderGame(object):
                                 active_unit = None
                                 menu_selection = None
                                 break
+                            elif menu_selection == 'melee':
+                                self.game.combat_action(active_unit, tile, menu_selection)
+                                active_unit = None
+                                menu_selection = None
+                                break
                             if city_selected:
                                 active_tile = tile
                                 active_city = city
@@ -308,15 +313,18 @@ class RenderGame(object):
                                 menu_selection = handle_menu(
                                     ev, self.game, active_tile, active_city, civ)
                                 active_unit_class = (active_unit._class if active_unit else None)
-                                active_unit_actions = ([x.lower() for x in active_unit.actions(self.game)] if active_unit else [])
-                                if menu_selection == 'move':
-                                    pass
-                                elif menu_selection == 'settle':
-                                    self.game.settle(active_unit)
-                                    active_unit = None
-                                    menu_selection = None
-                                elif active_unit_class == 'worker' and menu_selection in active_unit_actions:
-                                    self.game.worker_action(active_unit, menu_selection)
+                                active_unit_actions = (active_unit.actions(self.game) if active_unit else [])
+                                if menu_selection in active_unit_actions:
+                                    if menu_selection == 'move':
+                                        pass
+                                    elif menu_selection == 'settle':
+                                        self.game.settle(active_unit)
+                                        active_unit = None
+                                        menu_selection = None
+                                    elif active_unit_class == 'worker':
+                                        self.game.worker_action(active_unit, menu_selection)
+                                    elif active_unit_class == 'combat':
+                                        pass
                         elif ev.type == KEYDOWN:
                             keypress = pg.key.get_pressed()
                             if ev.key == pg.K_c and pg.key.get_mods() & pg.KMOD_CTRL:
@@ -341,8 +349,13 @@ class RenderGame(object):
 
     def tile_info_text(self, tile):
         lines = []
+        unit = self.game.get_unit(tile)
         city = self.game.get_city(tile)
         civ = self.game.get_civ(tile)
+        if unit:
+            lines.append("{} - {}".format(unit.name, unit._class))
+            if type(unit).__name__ == 'CombatUnit':
+                lines.append("HP: {}, CS: {}".format(unit.hp, unit.strength))
         if city:
             lines.append("{} ({}){}".format(city.name, city.pp, "*" if city.capital else 0))
         header = ", ".join([tile.base] + tile.features + tile.improvements + tile.resources)

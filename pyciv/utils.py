@@ -34,6 +34,10 @@ def neighbor(pos, n, xmax):
     return x, y
 
 
+def neighbors(pos, board, r=1):
+    return [board[x, y] for x, y in tiles_in_range(pos, r, board.shape)]
+
+
 def distance(pos1, pos2, xmax):
     x1, y1 = pos1
     x2, y2 = pos2
