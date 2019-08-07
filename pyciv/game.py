@@ -27,7 +27,7 @@ class Game(object):
             try:
                 self.board = mapmaker.make(self.shape, map_config_file=map_config_file)
             except:
-                continue
+                raise
             else:
                 return
         raise RuntimeError("failed to generate map")
@@ -101,7 +101,7 @@ class Game(object):
         return unit
 
     def move_unit(self, unit, tile):
-        tiles_in_range = civutils.tiles_in_range(unit.pos, 1, self.board.shape[0] - 1)
+        tiles_in_range = civutils.tiles_in_range(unit.pos, 1, self.shape)
         if (tile.pos in tiles_in_range) and (unit.moves >= tile.moves):
             target_unit = self.get_unit(tile)
             target_city = self.get_city(tile)
@@ -125,7 +125,8 @@ class Game(object):
         self.add_city(tile, civ, name, capital=capital)
         civ.remove_unit(unit)
 
-    def worker_action(self, tile, action):
+    def worker_action(self, unit, action):
+        tile = self.board[unit.pos]
         if action == 'chop':
             if 'forest' in tile.features:
                 tile.remove_features('forest')
@@ -137,6 +138,7 @@ class Game(object):
             self.get_city(tile, any_tile=True).pp += 20
         else:
             tile.add_improvement(action)
+        unit.move(unit.pos, 1)
 
     def end_turn(self):
         civ = self.active_civ()
@@ -152,15 +154,43 @@ class Game(object):
                             self.add_unit(tile, civ, unit.name, unit._class)
                             break
             city.update_pp()
+            city.update_tiles(self)
             civ.update_totals(city.yields)
         for civ in self.civs:
-            for unit in civ.units:
+            units = civ.units
+            for unit in units:
                 unit.reset_moves()
+                if unit._class == 'worker':
+                    if unit.builds == 0:
+                        civ.remove_unit(unit)
         self.turn += 1
         self.active += 1
         if self.active >= len(self.civs):
             self.active = 0
 
     def cpu_turn(self):
-        time.sleep(0.1)
+        civ = self.active_civ()
+        print(civ.name)
+        for unit in civ.units:
+            i = 0
+            while unit.actions(self) and i < MAX_ITER:
+                action = random.choice(unit.actions(self))
+                if action == 'move':
+                    move_opts = unit.get_moves(self)
+                    if move_opts:
+                        dest = self.board[random.choice(move_opts)]
+                        self.move_unit(unit, dest)
+                elif action == 'settle':
+                    self.settle(unit)
+                    break
+                elif unit._class == 'worker':
+                    self.worker_action(unit, action)
+                i += 1
+        for city in civ:
+            print(city, getattr(city.prod, 'name', None), city.prod_progress)
+            if not city.prod:
+                prod_opts = city.prod_options()
+                if prod_opts:
+                    prod = random.choice(prod_opts)
+                    city.begin_prod(prod)
         self.end_turn()

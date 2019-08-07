@@ -61,7 +61,10 @@ class Civilization(object):
         return unit
 
     def remove_unit(self, unit):
-        del self.units[self.units.index(unit)]
+        try:
+            del self.units[self.units.index(unit)]
+        except ValueError:
+            pass
 
     def update_totals(self, yields):
         self.science += yields['science']

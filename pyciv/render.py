@@ -286,7 +286,7 @@ class RenderGame(object):
                                 active_city = city
                                 if unit_selected:
                                     active_unit = unit
-                                PopupMenu(city_menu_data(self.game, active_city, civ, unit=active_unit), pos=(0, 0))
+                                PopupMenu(city_menu_data(self.game, active_city, civ, unit=active_unit))#, pos=(0, 0))
                             elif unit_selected:
                                 active_unit = unit
                                 PopupMenu(unit_menu_data(self.game, active_unit, civ))
@@ -301,11 +301,11 @@ class RenderGame(object):
                                 if menu_selection == 'move':
                                     pass
                                 elif menu_selection == 'settle':
-                                    active_unit.settle(self.game)
+                                    self.game.settle(active_unit)
                                     active_unit = None
                                     menu_selection = None
                                 elif active_unit_class == 'worker' and menu_selection in active_unit_actions:
-                                    self.game.worker_action(self.game.board[active_unit.pos], menu_selection)
+                                    self.game.worker_action(active_unit, menu_selection)
                         elif ev.type == KEYDOWN:
                             keypress = pg.key.get_pressed()
                             if ev.key == pg.K_c and pg.key.get_mods() & pg.KMOD_CTRL:
@@ -317,13 +317,6 @@ class RenderGame(object):
                     self.show_button(surface, (0, 0), "End turn", font, pressed)
                     if tile:
                         self.show_tile_info(surface, tile, mouse, font)
-                    ## Open city menu
-                    #if tile and pressed:
-                    #    active_city = city
-                    #    if active_city:
-                    #        self.show_production_menu(surface, active_city, polygon, font)
-                    #elif active_city:
-                    #    self.show_production_menu(surface, active_city, polygon, font)
                     pg.display.update()
                     clock.tick(self.rate)
         finally:
@@ -341,7 +334,7 @@ class RenderGame(object):
         civ = self.game.get_civ(tile)
         if city:
             lines.append("{} ({}){}".format(city.name, city.pp, "*" if city.capital else 0))
-        header = ", ".join([tile.base] + tile.features + tile.improvements)
+        header = ", ".join([tile.base] + tile.features + tile.improvements + tile.resources)
         if civ:
             header += " ({})".format(civ.name)
         lines.append(header)
@@ -364,18 +357,6 @@ class RenderGame(object):
         text = self.tile_info_text(tile)
         self.show_textbox(surface, mouse, text, font)
         return
-
-    def show_production_menu(self, surface, city, polygon, font):
-        text = city.name + " ({}){}\n".format(city.civ, "*" if city.capital else 0)
-        if city.prod:
-            text += "Current production:\n{}\n".format(city.prod.name)
-        text += "Choose production:\n"
-        text += "\n".join(city.prod_options())
-        lines = text.splitlines()
-        x = self.screen[0] - max(font.size(line)[0] for line in lines)
-        y = self.screen[1] - font.get_height() * len(lines)
-        pos = (x, y)
-        self.show_textbox(surface, pos, text, font)
 
     def show_button(self, surface, pos, text, font, pressed):
         mouse = pg.mouse.get_pos()
