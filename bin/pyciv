@@ -10,6 +10,10 @@ if __name__ == '__main__':
     parser.add_argument("-s", "--screen", nargs=2, type=int, default=(1920, 1080))
     parser.add_argument("-r", "--rate", type=int, default=30)
     parser.add_argument("--mapconfig", default="map.ini")
+    parser.add_argument("--random-seed", type=float)
     args = parser.parse_args()
+    if args.random_seed:
+        import random
+        random.seed(args.random_seed)
     game = Game(args.board, civs=['France', 'England', 'America'], leaders=['Me', 'You', 'Other'], map_config_file=args.mapconfig)
     RenderGame(game, screen=args.screen, rate=args.rate).render()
