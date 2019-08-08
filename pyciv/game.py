@@ -148,10 +148,10 @@ class Game(object):
         civ = self.find_civ(unit.civ)
         target_city = self.get_city(target_tile)
         target_unit = self.get_unit(target_tile)
-        if target_city:
-            target_civ = self.find_civ(target_city.civ)
-            if civ != target_civ:
-                if 'attack' in action:
+        if 'attack' in action:
+            if target_city:
+                target_civ = self.find_civ(target_city.civ)
+                if civ != target_civ:
                     unit.unfortify()
                     atk_dmg, def_dmg = civutils.calc_city_damage(unit, target_city, unit_tile, target_tile, action)
                     target_city.damage(atk_dmg)
@@ -168,11 +168,10 @@ class Game(object):
                             civ.remove_unit(unit)
                         else:
                             unit.move(unit.pos, 1)
-        elif target_unit:
-            target_unit_type = type(target_unit).__name__
-            target_civ = self.find_civ(target_unit.civ)
-            if civ != target_civ:
-                if 'attack' in action:
+            elif target_unit:
+                target_unit_type = type(target_unit).__name__
+                target_civ = self.find_civ(target_unit.civ)
+                if civ != target_civ:
                     unit.unfortify()
                     if target_unit_type == 'CombatUnit':
                         atk_dmg, def_dmg = civutils.calc_unit_damage(unit, target_unit, unit_tile, target_tile, action)
@@ -200,9 +199,9 @@ class Game(object):
                         print("{} ({}) killed {} ({})".format(unit.name, civ.name, target_unit.name, target_civ.name))
                         target_civ.remove_unit(target_unit)
                         unit.move(target_tile.pos, target_tile.moves)
-                elif action == 'fortified':
-                    unit.fortify()
-                    unit.move(unit.pos, unit.moves)
+        elif action == 'fortified':
+            unit.fortify()
+            unit.move(unit.pos, unit.moves)
 
     def end_turn(self):
         civ = self.active_civ()

@@ -154,38 +154,25 @@ class CombatUnit(Unit):
             return out
         if not self.fortified:
             out.append('fortify')
-        if self.attack == 'melee':
-            neighbors = civutils.neighbors(self.pos, game.board)
-            for nb in neighbors:
-                if game.get_unit(nb):
-                    target_civ = getattr(game.get_unit(nb), 'civ', None)
-                elif game.get_city(nb):
-                    target_civ = getattr(game.get_city(nb), 'civ', None)
-                else:
-                    target_civ = None
-                if target_civ is not None and target_civ != self.civ:
-                    out.append('melee attack')
-                    break
-        elif self.attack == 'range':
-            range_ = getattr(self, 'range', 1)
-            neighbors = civutils.neighbors(self.pos, game.board, r=range_)
-            for nb in neighbors:
-                target_civ = getattr(game.get_unit(nb), 'civ', None)
-                if target_civ is not None and target_civ != self.civ:
-                    out.append('range attack')
-                    break
+        if self.get_targets(game):
+            out.append(self.attack + ' attack')
         return out
 
     def get_targets(self, game):
         out = []
         range_ = getattr(self, 'range', 1)
         for tile in civutils.neighbors(self.pos, game.board, range_):
-            if self.moves >= tile.moves:
+            if not (self.attack == 'melee' and self.moves < tile.moves):
                 target_unit = game.get_unit(tile)
                 target_city = game.get_city(tile)
-                if target_unit:
-                    if target_unit.civ != self.civ:
-                        out.append(tile)
+                if game.get_unit(tile):
+                    target_civ = getattr(game.get_unit(tile), 'civ', None)
+                elif game.get_city(tile):
+                    target_civ = getattr(game.get_city(tile), 'civ', None)
+                else:
+                    target_civ = None
+                if target_civ is not None and target_civ != self.civ:
+                    out.append(tile)
         return out
 
     def damage(self, dmg):
