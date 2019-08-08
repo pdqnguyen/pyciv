@@ -107,6 +107,7 @@ class Tile(object):
                 out[y] += RESOURCE_YIELDS[r].get(y, 0)
             for i in self.improvements:
                 out[y] += IMPROVEMENT_YIELDS[i].get(y, 0)
+            out[y] = max(0, out[y])
         return out
 
     def print_yields(self):

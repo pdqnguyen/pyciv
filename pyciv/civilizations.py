@@ -66,6 +66,15 @@ class Civilization(object):
         except ValueError:
             pass
 
+    def remove_city(self, city):
+        try:
+            del self.cities[self.cities.index(city)]
+        except ValueError:
+            pass
+
+    def append_city(self, city):
+        self.cities.append(city)
+
     def update_totals(self, yields):
         self.science += yields['science']
         self.culture += yields['culture']

@@ -35,7 +35,7 @@ def neighbor(pos, n, xmax):
 
 
 def neighbors(pos, board, r=1):
-    return [board[x, y] for x, y in tiles_in_range(pos, r, board.shape)]
+    return [board[x, y] for x, y in tiles_in_range(pos, r, board.shape) if (x, y) != pos]
 
 
 def distance(pos1, pos2, xmax):
@@ -53,6 +53,33 @@ def distance(pos1, pos2, xmax):
         adx = max(0, adx - (ady) / 2)
     d = ceil(adx + ady)
     return d
+
+
+def pp_cost(pp):
+    n = pp - 1
+    return (15 + 8 * n + n ** 1.5)
+
+
+def tile_cost(ntiles):
+    return (10 + (6 * (ntiles - 7)) ** 1.3)
+
+
+def calc_unit_damage(unit1, unit2, unit1_tile, unit2_tile, attack):
+    return calc_damage(unit1.atk_strength(unit1_tile), unit2.def_strength(unit2_tile), attack)
+
+
+def calc_city_damage(unit, city, unit_tile, city_tile, attack):
+    return calc_damage(unit.atk_strength(unit_tile), city.def_strength(city_tile), attack)
+
+
+def calc_damage(strength1, strength2, attack):
+    strength_diff = strength1 - strength2
+    atk_dmg = 30 * 1.041 ** (strength_diff) #* random.uniform(0.75, 1.25)
+    if attack == 'melee attack':
+        def_dmg = 30 * 1.041 ** (-strength_diff) #* random.uniform(0.75, 1.25)
+    elif attack == 'range attack':
+        def_dmg = 0
+    return atk_dmg, def_dmg
 
 
 def random_str(n):

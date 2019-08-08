@@ -17,6 +17,9 @@ class City(object):
         self.tile_progress = 0
         self._init_buildings(buildings=buildings, capital=capital)
         self.capital = capital
+        self.strength = 1
+        self.max_hp = 100
+        self.hp = 100
 
     def __iter__(self):
         for tile in self.tiles:
@@ -67,16 +70,14 @@ class City(object):
     def update_pp(self):
         surplus = self.yields['food'] - (2 * self.pp)
         self.pp_progress += surplus
-        n = self.pp - 1
-        cost = 15 + 8 * n + n ** 1.5
+        cost = civutils.pp_cost(self.pp)
         if self.pp_progress > cost:
             self.grow(1)
             self.pp_progress -= cost
 
     def update_tiles(self, game):
         self.tile_progress += self.yields['culture']
-        n = len(self.tiles) - 7
-        cost = 10 + (6 * n) ** 1.3
+        cost = civutils.tile_cost(len(self.tiles))
         if self.tile_progress >= cost:
             nearby_tiles = []
             tiles_wi_5 = civutils.tiles_in_range(self.pos, 5, game.shape)
@@ -91,6 +92,9 @@ class City(object):
                 tile = max(nearby_tiles, key=lambda x: sum( x.yields.values()))
                 self.tiles.append(tile)
                 self.tile_progress = 0
+
+    def update_hp(self):
+        self.hp = min(self.max_hp, self.hp + 10)
 
     @property
     def yields(self):
@@ -108,3 +112,13 @@ class City(object):
                 mod *= b.modifiers.get(y, 1)
             out[y] += val * mod
         return out
+
+    def def_strength(self, tile):
+        out = self.strength * tile.defense_modifier()
+        return out
+
+    def damage(self, dmg):
+        self.hp = max(0, self.hp - int(dmg))
+
+    def reassign(self, new_civ):
+        self.civ = new_civ

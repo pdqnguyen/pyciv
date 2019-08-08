@@ -292,7 +292,7 @@ class RenderGame(object):
                                 active_unit = None
                                 menu_selection = None
                                 break
-                            elif menu_selection == 'melee':
+                            elif menu_selection in ['melee attack', 'range attack']:
                                 self.game.combat_action(active_unit, tile, menu_selection)
                                 active_unit = None
                                 menu_selection = None
@@ -360,6 +360,7 @@ class RenderGame(object):
                 lines.append("HP: {}, CS: {}/{}".format(unit.hp, unit.atk_strength(tile), unit.def_strength(tile)))
         if city:
             lines.append("{} ({}){}".format(city.name, city.pp, "*" if city.capital else 0))
+            lines.append("HP: {}, CS: {}".format(city.hp, city.def_strength(tile)))
         header = ", ".join([tile.base] + tile.features + tile.improvements + tile.resources)
         if civ:
             header += " ({})".format(civ.name)
