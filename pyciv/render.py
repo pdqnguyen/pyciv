@@ -44,7 +44,7 @@ class RenderGrid(pg.Surface):
         y_offset = 1.5 * self.radius * y
         return x_offset, y_offset
 
-    def draw_base(self, tile):
+    def draw_base(self, tile, color=None):
         x_offset, y_offset = self._xy_offset(tile.x, tile.y)
         # Hex corner locations
         points = [
@@ -57,16 +57,18 @@ class RenderGrid(pg.Surface):
         ]
         points = [(x + x_offset, y + y_offset) for (x, y) in points]
         # Get color
-        color = self._get_base_color(tile.base)
+        if color is None:
+            color = self._get_base_color(tile.base)
         # Hex tile
         poly = pg.draw.polygon(self, color, points)
         # Black outline
         pg.draw.polygon(self, pg.Color(0, 0, 0), points, 2)
         return poly
 
-    def draw_features(self, tile):
+    def draw_features(self, tile, color=None):
         x_offset, y_offset = self._xy_offset(tile.x, tile.y)
-        color = self._get_feature_color(tile.features[-1])
+        if color is None:
+            color = self._get_feature_color(tile.features[-1])
         circle_pos = (
             int(x_offset + 0.5 * SQRT3 * self.radius),
             int(y_offset + self.radius)
@@ -119,13 +121,17 @@ class RenderGrid(pg.Surface):
             self.draw_unit(unit.pos, color)
         return
 
-    def draw(self):
+    def draw(self, highlight=None):
         polygons = []
         for tile in self.board:
-            poly = self.draw_base(tile)
+            color = None
+            if highlight:
+                if tile not in highlight:
+                    color = pg.Color(0, 0, 0)
+            poly = self.draw_base(tile, color)
             polygons.append((tile, poly))
             if tile.features:
-                self.draw_features(tile)
+                self.draw_features(tile, color)
         for civ in self.civs:
             self.draw_civ(civ)
         return polygons
@@ -246,6 +252,8 @@ class RenderGame(object):
         os.environ['SDL_VIDEO_WINDOW_POS'] = '0,0'
         from pygame.locals import QUIT, KEYDOWN, MOUSEBUTTONDOWN, MOUSEBUTTONUP, USEREVENT
         grid = RenderGrid(self.game.board, self.game.civs, screen=self.screen)
+        grid2 = RenderGrid(self.game.board, self.game.civs, screen=self.screen)
+        grid2.set_alpha(80)
         try:
             pg.init()
             surface = pg.display.set_mode(self.screen, 1)
@@ -307,6 +315,8 @@ class RenderGame(object):
                                 active_unit = unit
                                 PopupMenu(unit_menu_data(self.game, active_unit, civ))
                             else:
+                                active_unit = None
+                                active_city = None
                                 pass #PopupMenu(menu_data())
                         elif ev.type == USEREVENT:
                             if ev.code == 'MENU':
@@ -333,7 +343,22 @@ class RenderGame(object):
                                 raise KeyboardInterrupt
                             elif ev.key == pg.K_RETURN and pg.key.get_mods() & pg.KMOD_SHIFT:
                                 self.game.end_turn()
+                    # Highlight tiles
+                    if active_unit:
+                        if menu_selection:
+                            if menu_selection == 'move':
+                                highlight = active_unit.get_moves(self.game)
+                            elif 'attack' in menu_selection:
+                                highlight = active_unit.get_targets(self.game)
+                            else:
+                                highlight = None
+                    elif city_selected:
+                        highlight = city.tiles
+                    else:
+                        highlight = None
+                    grid2.draw(highlight)
                     surface.blit(grid, (0, 0))
+                    surface.blit(grid2, (0, 0))
                     self.show_turn(surface, font)
                     self.show_button(surface, (0, 0), "End turn", font, pressed)
                     if tile:
