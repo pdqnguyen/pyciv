@@ -20,7 +20,7 @@ UNITS = {
     },
     'warrior': {
         'type': 'combat',
-        'movement': 2,
+        'movement': 10,
         'cost': {
             'gold': 30,
             'production': 20
@@ -39,13 +39,13 @@ def create_unit(name, unit_class, **kwargs):
 
 
 class Unit:
-    def __init__(self, name, _class=None, pos=None, civ=None, movement=2, moves=2, cost=None):
+    def __init__(self, name, _class=None, pos=None, civ=None, movement=2, cost=None):
         self.name = name
         self._class = _class
         self.pos = pos
         self.civ = civ
         self.movement = movement
-        self.moves = moves
+        self.moves = movement
         self.cost = cost
 
     def move(self, new_pos, moves):
@@ -117,11 +117,25 @@ class CombatUnit(Unit):
         self.max_hp = kwargs.pop('max_hp', 100)
         self.hp = kwargs.pop('hp', 100)
         self.strength = kwargs.pop('strength', 10)
+        self.fortified = kwargs.pop('fortified', False)
         super(CombatUnit, self).__init__(name, **kwargs)
+
+    def atk_strength(self, tile):
+        out = self.strength * tile.attack_modifier()
+        return out
+
+    def def_strength(self, tile):
+        out = self.strength * tile.defense_modifier()
+        if self.fortified:
+            out *= 1.5
+        return out
 
     def actions(self, game):
         out = (['move'] if self.get_moves(game) else [])
-        out += ['fortify']
+        if self.moves == 0:
+            return out
+        if not self.fortified:
+            out.append('fortify')
         neighbors = civutils.neighbors(self.pos, game.board)
         for nb in neighbors:
             target_civ = getattr(game.get_unit(nb), 'civ', None)
@@ -143,4 +157,11 @@ class CombatUnit(Unit):
         return out
 
     def damage(self, dmg):
-        self.hp -= dmg
+        self.hp -= int(dmg)
+
+    def fortify(self):
+        self.moves = 0
+        self.fortified = True
+
+    def unfortify(self):
+        self.fortified = False

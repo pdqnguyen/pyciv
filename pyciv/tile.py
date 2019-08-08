@@ -116,6 +116,28 @@ class Tile(object):
                 s += "{y}: {val}\n".format(y=y, val=val)
         return s
 
+    def attack_modifier(self):
+        mod = 1
+        if 'hill' in self.features:
+            mod *= 1.25
+        if 'mountain' in self.features:
+            mod *= 1.5
+        return mod
+
+    def defense_modifier(self):
+        mod = 1
+        if self.base == 'ocean':
+            mod /= 1.25
+        if 'hill' in self.features:
+            mod *= 1.25
+        if 'mountain' in self.features:
+            mod *= 1.5
+        if 'forest' in self.features or 'rainforest' in self.features:
+            mod *= 1.25
+        if 'floodplain' in self.features:
+            mod /= 1.25
+        return mod
+
 
 class TileArray(np.ndarray):
     def __new__(cls, shape=(1, 1)):

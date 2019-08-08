@@ -113,6 +113,8 @@ class Game(object):
                 if target_city.civ != unit.civ:
                     print("cannot enter enemy city")
                     return
+            if type(unit).__name__ == 'CombatUnit':
+                unit.unfortify()
             unit.move(tile.pos, tile.moves)
         else:
             print("invalid move")
@@ -150,32 +152,39 @@ class Game(object):
             target_unit_type = type(target_unit).__name__
             target_civ = self.find_civ(target_unit.civ)
             civ = self.find_civ(unit.civ)
-            if action == 'melee':
-                if target_unit_type == 'CombatUnit':
-                    strength_diff = unit.strength - target_unit.strength
-                    atk_dmg = 30 * 1.041 ** strength_diff * random.uniform(0.75, 1.25)
-                    def_dmg = 30 * 1.041 ** strength_diff * random.uniform(0.75, 1.25)
-                    unit.damage(atk_dmg)
-                    target_unit.damage(def_dmg)
-                    hp = unit.hp
-                    target_hp = target_unit.hp
-                    if hp > 0 and target_hp <= 0:
+            if civ!= target_civ:
+                if action == 'melee':
+                    unit.unfortify()
+                    if target_unit_type == 'CombatUnit':
+                        strength_diff = unit.atk_strength(unit_tile) - target_unit.def_strength(target_tile)
+                        atk_dmg = 30 * 1.041 ** (strength_diff) #* random.uniform(0.75, 1.25)
+                        def_dmg = 30 * 1.041 ** (-strength_diff) #* random.uniform(0.75, 1.25)
+                        print("{} ({}) did {} damage to {} ({})".format(unit.name, civ.name, atk_dmg, target_unit.name, target_civ.name))
+                        print("{} ({}) did {} damage to {} ({})".format(target_unit.name, target_civ.name, def_dmg, unit.name, civ.name))
+                        target_unit.damage(atk_dmg)
+                        unit.damage(def_dmg)
+                        hp = unit.hp
+                        target_hp = target_unit.hp
+                        if hp > 0 and target_hp <= 0:
+                            print("{} ({}) killed {} ({})".format(unit.name, civ.name, target_unit.name, target_civ.name))
+                            target_civ.remove_unit(target_unit)
+                            self.move_unit(unit, target_tile)
+                        elif hp <= 0 and target_hp > 0:
+                            print("{} ({}) died while attacking {} ({})".format(unit.name, civ.name, target_unit.name, target_civ.name))
+                            civ.remove_unit(unit)
+                        elif hp <= 0 and target_hp <= 0:
+                            print("{} ({}) and {} ({}) died fighting".format(unit.name, civ.name, target_unit.name, target_civ.name))
+                            civ.remove_unit(unit)
+                            target_civ.remove_unit(target_unit)
+                        else:
+                            unit.move(unit.pos, 1)
+                    elif target_unit_type in ['WorkerUnit', 'SettlerUnit']:
                         print("{} ({}) killed {} ({})".format(unit.name, civ.name, target_unit.name, target_civ.name))
-                        target_civ.remove_unit(target_unit)
+                        civ.remove_unit(target_unit)
                         self.move_unit(unit, target_tile)
-                    elif hp <= 0 and target_hp > 0:
-                        print("{} ({}) died while attacking {} ({})".format(unit.name, civ.name, target_unit.name, target_civ.name))
-                        civ.remove_unit(unit)
-                    elif hp <= 0 and target_hp <= 0:
-                        print("{} ({}) and {} ({}) died fighting".format(unit.name, civ.name, target_unit.name, target_civ.name))
-                        civ.remove_unit(unit)
-                        target_civ.remove_unit(target_unit)
-                    else:
-                        self.move_unit(unit, unit_tile)
-                elif target_unit_type in ['WorkerUnit', 'SettlerUnit']:
-                    print("{} ({}) killed {} ({})".format(unit.name, civ.name, target_unit.name, target_civ.name))
-                    civ.remove_unit(target_unit)
-                    self.move_unit(unit, target_tile)
+                elif action == 'fortified':
+                    unit.fortify()
+                    unit.move(unit.pos, unit.moves)
 
     def end_turn(self):
         civ = self.active_civ()

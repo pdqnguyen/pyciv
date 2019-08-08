@@ -315,15 +315,17 @@ class RenderGame(object):
                                 active_unit_class = (active_unit._class if active_unit else None)
                                 active_unit_actions = (active_unit.actions(self.game) if active_unit else [])
                                 if menu_selection in active_unit_actions:
-                                    if menu_selection == 'move':
-                                        pass
-                                    elif menu_selection == 'settle':
+                                    if menu_selection == 'settle':
                                         self.game.settle(active_unit)
                                         active_unit = None
                                         menu_selection = None
                                     elif active_unit_class == 'worker':
                                         self.game.worker_action(active_unit, menu_selection)
-                                    elif active_unit_class == 'combat':
+                                    elif menu_selection == 'fortify':
+                                        active_unit.fortify()
+                                        active_unit = None
+                                        menu_selection = None
+                                    else:
                                         pass
                         elif ev.type == KEYDOWN:
                             keypress = pg.key.get_pressed()
@@ -355,7 +357,7 @@ class RenderGame(object):
         if unit:
             lines.append("{} - {}".format(unit.name, unit._class))
             if type(unit).__name__ == 'CombatUnit':
-                lines.append("HP: {}, CS: {}".format(unit.hp, unit.strength))
+                lines.append("HP: {}, CS: {}/{}".format(unit.hp, unit.atk_strength(tile), unit.def_strength(tile)))
         if city:
             lines.append("{} ({}){}".format(city.name, city.pp, "*" if city.capital else 0))
         header = ", ".join([tile.base] + tile.features + tile.improvements + tile.resources)
