@@ -7,6 +7,7 @@ from configparser import ConfigParser
 from .tile import Tile, TileArray
 from .features import FEATURES
 from .resources import resource_options
+from . import utils as civutils
 
 MAP_CONFIG_FILE = 'map.ini'
 
@@ -136,7 +137,7 @@ def build_landmass(
         else:
             tile = random.choice(out)
         neighbors = get_tiles_for_landmass(
-            board.get_neighbors(tile))
+            civutils.neighbors(tile.pos, board))
         if neighbors:
             new = random.choice(neighbors)
             base = generate_base(new.y, board)
@@ -150,7 +151,7 @@ def build_coastline(board, landmass, max_coast_width=1, coast_density=1):
     coasts = []
     for tile in landmass:
         neighbors = get_tiles_for_landmass(
-            board.get_neighbors(tile))
+            civutils.neighbors(tile.pos, board))
         for neighbor in neighbors:
             neighbor.add_feature('coast')
             coasts.append(neighbor)
@@ -158,7 +159,7 @@ def build_coastline(board, landmass, max_coast_width=1, coast_density=1):
         new_coasts = []
         for tile in coasts:
             neighbors = get_tiles_for_landmass(
-                board.get_neighbors(tile))
+                civutils.neighbors(tile.pos, board))
             for neighbor in neighbors:
                 if random.random() < coast_density:
                     neighbor.add_feature('coast')
@@ -177,7 +178,7 @@ def build_icecaps(board, max_ice_width=1, ice_density=1):
     for _ in range(max_ice_width):
         new_ice = []
         for tile in ice:
-            neighbors = [n for n in board.get_neighbors(tile) if n.base != 'ice']
+            neighbors = [n for n in civutils.neighbors(tile.pos, board) if n.base != 'ice']
             for neighbor in neighbors:
                 if random.random() < ice_density:
                     neighbor.add_feature('ice')
@@ -201,7 +202,7 @@ def build_feature(board, feature, size, stretch=0):
         else:
             tile = random.choice(out)
         neighbors = tile_func(
-            board.get_neighbors(tile))
+            civutils.neighbors(tile.pos, board))
         if neighbors:
             neighbor = random.choice(neighbors)
             neighbor.add_feature(feature)
