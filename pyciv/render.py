@@ -325,7 +325,9 @@ class RenderGame(object):
                                 active_unit_class = (active_unit._class if active_unit else None)
                                 active_unit_actions = (active_unit.actions(self.game) if active_unit else [])
                                 if menu_selection in active_unit_actions:
-                                    if menu_selection == 'settle':
+                                    if menu_selection == 'move':
+                                        pass
+                                    elif menu_selection == 'settle':
                                         self.game.settle(active_unit)
                                         active_unit = None
                                         menu_selection = None
