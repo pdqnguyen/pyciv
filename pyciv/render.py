@@ -16,6 +16,8 @@ from . import utils as civutils
 
 SQRT3 = math.sqrt(3)
 
+TILE_INFO_DELAY = 0.3
+
 
 def colorname2pg(name):
     rgb = [int(x * 255) for x in to_rgb(name)]
@@ -265,6 +267,8 @@ class RenderGame(object):
                 if self.game.active_civ().name not in self.game.humans:
                     self.game.cpu_turn()
                 # render loop
+                hover_tile = None
+                hover_tile_time = time.time()
                 active_tile = None
                 active_unit = None
                 active_city = None
@@ -364,7 +368,11 @@ class RenderGame(object):
                     self.show_turn(surface, font)
                     self.show_button(surface, (0, 0), "End turn", font, pressed)
                     if tile:
-                        self.show_tile_info(surface, tile, mouse, font)
+                        if hover_tile != tile:
+                            hover_tile = tile
+                            tile_hover_time = time.time()
+                        if time.time() - tile_hover_time > TILE_INFO_DELAY:
+                            self.show_tile_info(surface, tile, mouse, font)
                     pg.display.update()
                     clock.tick(self.rate)
         finally:
