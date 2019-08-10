@@ -91,15 +91,18 @@ class RenderGrid(pg.Surface):
 
     def draw_territory(self, pos, color):
         x_offset, y_offset = self._xy_offset(*pos)
-        start_pos = (
-            int(x_offset + 0.5 * self.radius),
-            int(y_offset + 0.5 * self.radius)
-        )
-        end_pos = (
-            int(x_offset + 1.5 * self.radius),
-            int(y_offset + 1.5 * self.radius)
-        )
-        pg.draw.line(self, color, start_pos, end_pos, 4)
+        points = [
+            (0.5 * SQRT3 * self.radius, 0),
+            (SQRT3 * self.radius, 0.5 * self.radius),
+            (SQRT3 * self.radius, 1.5 * self.radius),
+            (0.5 * SQRT3 * self.radius, 2 * self.radius),
+            (0, 1.5 * self.radius),
+            (0, 0.5 * self.radius)
+        ]
+        points = [(x + x_offset, y + y_offset) for (x, y) in points]
+        if color is None:
+            color = self._get_base_color(tile.base)
+        pg.draw.polygon(self, color, points, 4)
         return
 
     def draw_unit(self, pos, color, bordercolor=colorname2pg('black')):
