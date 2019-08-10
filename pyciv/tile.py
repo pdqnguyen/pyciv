@@ -9,35 +9,6 @@ from .buildings import Building
 from .utils import neighbor
 
 
-class TileYield(object):
-    def __init__(self, **yields):
-        for y in YIELD_TYPES:
-            val = yields.get(y, 0)
-            setattr(self, y, val)
-
-    def __str__(self):
-        s = ""
-        d = {y: getattr(self, y, 0) for y in YIELD_TYPES}
-        for y, val in self.__dict__.items():
-            if val > 0:
-                s += "{y}: {val}\n".format(y=y, val=val)
-        return s
-
-    def update(self, **d):
-        for y, val in d.items():
-            setattr(self, y, val)
-
-    def add(self, **d):
-        for y, val in d.items():
-            old = getattr(self, y)
-            setattr(self, y, old + val)
-
-    def subtract(self, **d):
-        for y, val in d.items():
-            old = getattr(self, y)
-            setattr(self, y, old - val)
-
-
 class Tile(object):
     def __init__(self, x, y, base, features=[]):
         self.x = x
