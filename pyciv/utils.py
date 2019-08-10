@@ -76,8 +76,12 @@ def calc_unit_damage(unit1, unit2, unit1_tile, unit2_tile, attack):
     return calc_damage(unit1.atk_strength(unit1_tile), unit2.def_strength(unit2_tile), attack)
 
 
-def calc_city_damage(unit, city, unit_tile, city_tile, attack):
-    return calc_damage(unit.atk_strength(unit_tile), city.def_strength(city_tile), attack)
+def calc_city_damage(unit, city, unit_tile, city_tile, attack, garrison=None):
+    def_strength = city.def_strength(city_tile)
+    if garrison:
+        if garrison._type == 'combat':
+            def_strength += garrison.def_strength(city_tile)
+    return calc_damage(unit.atk_strength(unit_tile), def_strength, attack)
 
 
 def calc_damage(strength1, strength2, attack):

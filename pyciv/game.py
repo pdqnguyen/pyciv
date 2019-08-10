@@ -47,7 +47,7 @@ class Game(object):
                         unit2_name = 'unit' + civutils.random_str(8)
                         self.add_unit(tile1, civ, unit1_name, 'settler')
 #                         self.add_unit(tile2, civ, unit2_name, 'warrior')
-                        for nb in civutils.neighbors(tile1.pos, self.board, 1):
+                        for nb in civutils.neighbors(tile1.pos, self.board, 1)[:3]:
                             self.add_unit(nb, civ, unit2_name, 'warrior')
                         break
                 i += 1
@@ -153,7 +153,7 @@ class Game(object):
                 target_civ = self.find_civ(target_city.civ)
                 if civ != target_civ:
                     unit.unfortify()
-                    atk_dmg, def_dmg = civutils.calc_city_damage(unit, target_city, unit_tile, target_tile, action)
+                    atk_dmg, def_dmg = civutils.calc_city_damage(unit, target_city, unit_tile, target_tile, action, garrison=target_unit)
                     target_city.damage(atk_dmg)
                     unit.damage(def_dmg)
                     hp = unit.hp
