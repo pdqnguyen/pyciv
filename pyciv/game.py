@@ -46,9 +46,9 @@ class Game(object):
                         unit1_name = 'unit' + civutils.random_str(8)
                         unit2_name = 'unit' + civutils.random_str(8)
                         self.add_unit(tile1, civ, unit1_name, 'settler')
-                        self.add_unit(tile2, civ, unit2_name, 'warrior')
-#                         for nb in civutils.neighbors(tile1.pos, self.board, 1):
-#                             self.add_unit(nb, civ, unit2_name, 'warrior')
+#                         self.add_unit(tile2, civ, unit2_name, 'warrior')
+                        for nb in civutils.neighbors(tile1.pos, self.board, 1):
+                            self.add_unit(nb, civ, unit2_name, 'warrior')
                         break
                 i += 1
 
@@ -163,11 +163,13 @@ class Game(object):
                             print("{} ({}) took over {} ({})".format(unit.name, civ.name, target_city.name, target_civ.name))
                             self.change_civ(target_city, civ)
                             self.move_unit(unit, target_tile)
+                            unit.update_exp(2)
                         elif hp <= 0 and target_hp > 0:
                             print("{} ({}) died while attacking {} ({})".format(unit.name, civ.name, target_city.name, target_civ.name))
                             civ.remove_unit(unit)
                         else:
                             unit.move(unit.pos, 1)
+                            unit.update_exp(2)
             elif target_unit:
                 target_unit_type = type(target_unit).__name__
                 target_civ = self.find_civ(target_unit.civ)
@@ -175,6 +177,8 @@ class Game(object):
                     unit.unfortify()
                     if target_unit_type == 'CombatUnit':
                         atk_dmg, def_dmg = civutils.calc_unit_damage(unit, target_unit, unit_tile, target_tile, action)
+                        print("{} ({}) did {} damage to {} ({})".format(unit.name, civ.name, atk_dmg, target_unit.name, target_civ.name))
+                        print("{} ({}) did {} damage to {} ({})".format(target_unit.name, target_civ.name, def_dmg, unit.name, civ.name))
                         target_unit.damage(atk_dmg)
                         unit.damage(def_dmg)
                         hp = unit.hp
@@ -186,15 +190,19 @@ class Game(object):
                                 unit.move(target_tile.pos, target_tile.moves)
                             else:
                                 unit.move(unit.pos, 1)
+                            unit.update_exp(2)
                         elif hp <= 0 and target_hp > 0:
                             print("{} ({}) died while attacking {} ({})".format(unit.name, civ.name, target_unit.name, target_civ.name))
                             civ.remove_unit(unit)
+                            target_unit.update_exp(1)
                         elif hp <= 0 and target_hp <= 0:
                             print("{} ({}) and {} ({}) died fighting".format(unit.name, civ.name, target_unit.name, target_civ.name))
                             civ.remove_unit(unit)
                             target_civ.remove_unit(target_unit)
                         else:
+                            target_unit.update_exp(1)
                             unit.move(unit.pos, 1)
+                            unit.update_exp(2)
                     elif target_unit_type in ['WorkerUnit', 'SettlerUnit']:
                         print("{} ({}) killed {} ({})".format(unit.name, civ.name, target_unit.name, target_civ.name))
                         target_civ.remove_unit(target_unit)
@@ -220,13 +228,12 @@ class Game(object):
             city.update_tiles(self)
             civ.update_totals(city.yields)
             city.update_hp()
-        for civ in self.civs:
-            units = civ.units
-            for unit in units:
-                unit.reset_moves()
-                if unit._class == 'worker':
-                    if unit.builds == 0:
-                        civ.remove_unit(unit)
+        units = civ.units
+        for unit in units:
+            unit.end_turn(self)
+            if unit._class == 'worker':
+                if unit.builds == 0:
+                    civ.remove_unit(unit)
         self.turn += 1
         self.active += 1
         if self.active >= len(self.civs):

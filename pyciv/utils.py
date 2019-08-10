@@ -1,6 +1,6 @@
 import random
 import string
-from math import ceil
+from math import *
 
 
 def tiles_in_range(pos, r, shape):
@@ -64,6 +64,14 @@ def tile_cost(ntiles):
     return (10 + (6 * (ntiles - 7)) ** 1.3)
 
 
+def level_cost(level):
+    return round(10 * sqrt(level))
+
+
+def level_modifier(level):
+    return 1. + 0.5 * (level - 1)
+
+
 def calc_unit_damage(unit1, unit2, unit1_tile, unit2_tile, attack):
     return calc_damage(unit1.atk_strength(unit1_tile), unit2.def_strength(unit2_tile), attack)
 
@@ -74,11 +82,14 @@ def calc_city_damage(unit, city, unit_tile, city_tile, attack):
 
 def calc_damage(strength1, strength2, attack):
     strength_diff = strength1 - strength2
+    strength_diff = min(100, max(-100, strength_diff))
     atk_dmg = 30 * 1.041 ** (strength_diff) #* random.uniform(0.75, 1.25)
     if attack == 'melee attack':
         def_dmg = 30 * 1.041 ** (-strength_diff) #* random.uniform(0.75, 1.25)
     elif attack == 'range attack':
         def_dmg = 0
+    atk_dmg = min(100, int(atk_dmg))
+    def_dmg = min(100, int(def_dmg))
     return atk_dmg, def_dmg
 
 

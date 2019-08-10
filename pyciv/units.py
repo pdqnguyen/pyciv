@@ -56,6 +56,7 @@ class Unit:
     def __init__(self, name, _class=None, pos=None, civ=None, movement=2, cost=None, **kwargs):
         self.name = name
         self._class = _class
+        self._type = UNITS[self._class]['type']
         self.pos = pos
         self.civ = civ
         self.movement = movement
@@ -101,6 +102,9 @@ class SettlerUnit(Unit):
             out.append('settle')
         return out
 
+    def end_turn(self, game):
+        self.reset_moves()
+
 
 class WorkerUnit(Unit):
     def __init__(self, name, **kwargs):
@@ -121,6 +125,9 @@ class WorkerUnit(Unit):
             out += improvement_options(tile)
         return out
 
+    def end_turn(self, game):
+        self.reset_moves()
+
 
 class SupportUnit(Unit):
     def __init__(self, name, **kwargs):
@@ -131,6 +138,8 @@ class CombatUnit(Unit):
     def __init__(self, name, **kwargs):
         self.max_hp = kwargs.pop('max_hp', 100)
         self.hp = kwargs.pop('hp', 100)
+        self.exp = 0
+        self.level = 1
         self.fortified = kwargs.pop('fortified', False)
         super(CombatUnit, self).__init__(name, **kwargs)
 
@@ -139,11 +148,14 @@ class CombatUnit(Unit):
             out = self.strength
         elif self.attack == 'range':
             out = self.range_strength
+        out *= civutils.level_modifier(self.level)
         out *= tile.attack_modifier()
         return out
 
     def def_strength(self, tile):
-        out = self.strength * tile.defense_modifier()
+        out = self.strength
+        out *= civutils.level_modifier(self.level)
+        out *= tile.defense_modifier()
         if self.fortified:
             out *= 1.5
         return out
@@ -184,3 +196,25 @@ class CombatUnit(Unit):
 
     def unfortify(self):
         self.fortified = False
+
+    def end_turn(self, game):
+        self.reset_moves()
+        if self.fortified:
+            civ = game.get_civ(game.board[self.pos])
+            if getattr(civ, 'name', None) == self.civ:
+                self.update_hp(30)
+            else:
+                self.update_hp(10)
+
+    def update_hp(self, hp=10):
+        if self.hp < 100:
+            self.hp = min(100, self.hp + int(hp))
+
+    def update_exp(self, exp=1):
+        self.exp += int(exp)
+        cost = civutils.level_cost(self.level)
+        if self.exp >= cost:
+            print("{} leveled up".format(self.name))
+            self.exp = 0
+            self.level += 1
+            self.strength *= 10
