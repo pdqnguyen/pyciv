@@ -7,6 +7,7 @@ from .render import RenderGame
 from . import utils as civutils
 from .buildings import Building
 from .units import Unit
+from .ai import AI
 
 MAX_ITER = 1000
 MIN_CITY_SEP = 4
@@ -16,18 +17,25 @@ class Game(object):
     def __init__(self, shape, civs, leaders, map_config_file=None):
         self.shape = shape
         self.civs = [Civilization(civ, leaders) for civ in civs]
+        self._init_ai()
         self.humans = civs[:1]
         self._init_map(map_config_file=map_config_file)
         self._init_civs()
         self.turn = 0
         self.active = 0
 
+    def _init_ai(self):
+        ai = {}
+        for civ in self.civs:
+            ai[civ.name] = AI(civ)
+        self.ai = ai
+
     def _init_map(self, map_config_file=None):
         for _ in range(MAP_ATTEMPTS):
             try:
                 self.board = mapmaker.make(self.shape, map_config_file=map_config_file)
             except:
-                pass
+                raise
             else:
                 return
         raise RuntimeError("failed to generate map")
@@ -240,31 +248,5 @@ class Game(object):
             self.active = 0
 
     def cpu_turn(self):
-        civ = self.active_civ()
-        for unit in civ.units:
-            i = 0
-            while unit.actions(self) and i < MAX_ITER:
-                action = random.choice(unit.actions(self))
-                if action == 'move':
-                    moves = unit.get_moves(self)
-                    if moves:
-                        move = random.choice(moves)
-                        self.move_unit(unit, move)
-                elif action == 'settle':
-                    self.settle(unit)
-                    break
-                elif 'attack' in action:
-                    targets = unit.get_targets(self)
-                    if targets:
-                        target = random.choice(targets)
-                        self.combat_action(unit, target, action)
-                elif unit._class == 'worker':
-                    self.worker_action(unit, action)
-                i += 1
-        for city in civ:
-            if not city.prod:
-                prod_opts = city.prod_options()
-                if prod_opts:
-                    prod = random.choice(prod_opts)
-                    city.begin_prod(prod)
+        self.ai[self.active_civ().name].play(self)
         self.end_turn()
