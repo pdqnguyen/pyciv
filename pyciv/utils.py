@@ -4,8 +4,8 @@ from math import *
 
 
 def tiles_in_range(pos, r, shape):
-    out = [pos]
-    seeds = out[:]
+    out = []
+    seeds = [pos]
     for _ in range(r):
         new_out = []
         for seed in seeds:
@@ -35,15 +35,55 @@ def neighbor(pos, n, xmax):
 
 
 def neighbors(pos, board, r=1):
-    return [board[x, y] for x, y in tiles_in_range(pos, r, board.shape) if (x, y) != pos]
+    shape = board.shape
+    out = []
+    seeds = [board[pos]]
+    for _ in range(r):
+        new_out = []
+        for seed in seeds:
+            for n in range(6):
+                x, y = neighbor(seed.pos, n, shape[0] - 1)
+                if y < shape[1]:
+                    tile = board[x, y]
+                    if (tile not in out):
+                        new_out.append(tile)
+        out += new_out
+        seeds = new_out[:]
+    return out
 
 
-def distance(pos1, pos2, xmax):
+def path(start, end, shape):
+    paths = []
+    for _ in range(1000):
+        path = [start]
+        for _ in range(10):
+            if path[-1] == end or distance(start, path[-1], shape[0]) > distance(start, end, shape[0]):
+                break
+            opts = [neighbor(path[-1], n, shape[0]) for n in range(6)]
+            opts = [(x, y) for x, y in opts if (y >= 0) and (y < shape[1])]
+            if len(opts) == 0:
+                break
+            elif end in opts:
+                path.append(end)
+            else:
+                nb = random.choice(opts)
+                if nb not in path:
+                    path.append(nb)
+        if end in path and path not in paths:
+            paths.append(path)
+    if paths:
+        return min(paths, key=len)
+    else:
+        return []
+
+
+def distance(pos1, pos2, xsize):
     x1, y1 = pos1
     x2, y2 = pos2
     dx1 = x2 - x1
-    dx2 = x2 - (x1 + xmax)
-    dx = (dx1 if abs(dx1) < abs(dx2) else dx2)
+    dx2 = x2 - (x1 + xsize)
+    dx3 = (x2 + xsize) - x1
+    dx = min([dx1, dx2, dx3], key=abs)
     dy = y2 - y1
     adx = abs(dx)
     ady = abs(dy)
