@@ -16,7 +16,7 @@ from . import utils as civutils
 
 SQRT3 = math.sqrt(3)
 
-TILE_INFO_DELAY = 0.3
+TILE_INFO_DELAY = 3
 
 
 def colorname2pg(name):
@@ -358,7 +358,7 @@ class RenderGame(object):
                         if menu_selection:
                             if menu_selection == 'move':
                                 if hover_tile != tile and tile is not None:
-                                    path = civutils.path(active_unit.pos, tile.pos, self.game.board.shape)
+                                    path = civutils.find_best_path(active_unit.pos, tile.pos, self.game.board)
                                 if path:
                                     for p in path:
                                         grid.draw_territory(p, pg.Color(255, 0, 0))
@@ -379,7 +379,8 @@ class RenderGame(object):
                     if tile:
                         if active_unit:
                             if menu_selection == 'move':
-                                self.show_distance(surface, font, active_unit.pos, tile.pos, mouse)
+                                if path:
+                                    self.show_distance(surface, font, path, mouse)
                         if hover_tile != tile:
                             hover_tile = tile
                             tile_hover_time = time.time()
@@ -396,8 +397,8 @@ class RenderGame(object):
                 return t, p
         return None, None
 
-    def show_distance(self, surface, font, pos1, pos2, mouse):
-        d = civutils.distance(pos1, pos2, self.game.board.shape[0])
+    def show_distance(self, surface, font, path, mouse):
+        d = civutils.calc_path_moves(path, self.game.board)
         text = font.render(str(d), 1, (255, 255, 255))
         text_rect = text.get_rect()
         text_rect.bottomleft = (mouse[0], mouse[1] - font.get_height())

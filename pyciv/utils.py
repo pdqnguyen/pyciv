@@ -1,6 +1,8 @@
 import random
 import string
-from math import *
+import math
+import multiprocessing as mp
+import numpy as np
 
 
 def tiles_in_range(pos, r, shape):
@@ -52,29 +54,112 @@ def neighbors(pos, board, r=1):
     return out
 
 
-def path(start, end, shape):
-    paths = []
-    for _ in range(1000):
-        path = [start]
-        for _ in range(10):
-            if path[-1] == end or distance(start, path[-1], shape[0]) > distance(start, end, shape[0]):
-                break
-            opts = [neighbor(path[-1], n, shape[0]) for n in range(6)]
-            opts = [(x, y) for x, y in opts if (y >= 0) and (y < shape[1])]
-            if len(opts) == 0:
-                break
-            elif end in opts:
-                path.append(end)
+def create_path(start, end, xmax, wrap=False, max_iter=100):
+    if wrap:
+        if end[0] < start[0]:
+            end = (end[0] + (xmax + 1), end[1])
+        else:
+            start = (start[0] + (xmax + 1), start[1])
+    path = [start]
+    i = 0
+    while path[-1] != end and i < max_iter:
+        start = path[-1]
+        dy = end[1] - start[1]
+        if dy % 2 == 0:
+            dx = end[0] - start[0]
+        elif start[1] % 2 != 0:
+            dx = end[0] - 0.5 - start[0]
+        else:
+            dx = end[0] +  0.5 - start[0]
+        angle = math.atan2(dy, dx)
+        n = int(-(angle - 5 * math.pi / 6) * 3 / math.pi % 6)
+        if wrap:
+            path.append(neighbor(start, n, xmax * 2))
+        else:
+            path.append(neighbor(start, n, xmax))
+        i += 1
+    if wrap:
+        path_wrapped = []
+        for x, y in path:
+            if x > xmax:
+                path_wrapped.append((x - (xmax + 1), y))
             else:
-                nb = random.choice(opts)
-                if nb not in path:
-                    path.append(nb)
-        if end in path and path not in paths:
-            paths.append(path)
-    if paths:
-        return min(paths, key=len)
-    else:
-        return []
+                path_wrapped.append((x, y))
+        path = path_wrapped
+    return path
+
+
+def calc_path_moves(path, board):
+    return sum(board[p].moves for p in path[1:])
+
+
+def perturb_path(path, board, forward=True):
+    xmax = board.shape[0] - 1
+    ymax = board.shape[1] - 1
+    weights = np.array([board[p].moves for p in path[1:]]).astype(float)
+    weights /= weights.sum()
+    i = np.random.choice(range(1, len(path)), p=weights)
+    nbs = []
+    for j in range(6):
+        nb = neighbor(path[i - 1], j, xmax)
+        if nb not in path and nb[1] <= ymax:
+            nb_nbs = [neighbor(nb, k, xmax) for k in range(6)]
+            if not (nb in nb_nbs and path[i - 1] in nb_nbs):
+                nbs.append(nb)
+    if nbs:
+        weights = np.array([1 / board[nb].moves for nb in nbs])
+        weights /= weights.sum()
+        new_tile = nbs[np.random.choice(range(len(nbs)), p=weights)]
+        if path[-1] == (6, 2):
+            print(path[i - 1], nbs, nb)
+        if forward:
+            segment1 = create_path(new_tile, path[-1], xmax)
+            segment2 = create_path(new_tile, path[-1], xmax, wrap=True)
+            segment = min((segment1, segment2), key=lambda x: calc_path_moves(x, board))
+            new_path = path[:i] + segment
+        else:
+            segment1 = create_path(path[0], new_tile, xmax)
+            segment2 = create_path(path[0], new_tile, xmax, wrap=True)
+            segment = min((segment1, segment2), key=lambda x: calc_path_moves(x, board))
+            new_path = segment + path[i - 1:]
+        return new_path
+
+
+def find_best_path(start, end, board, max_iter=300):
+    xmax = board.shape[0] - 1
+    ymax = board.shape[1] - 1
+    path1 = create_path(start, end, xmax)
+    path2 = create_path(start, end, xmax, wrap=True)
+    if len(path1) < 3:
+        return path1
+    elif len(path2) < 3:
+        return path2
+    paths1 = [path1]
+    paths2 = [path2]
+    moves1 = [calc_path_moves(path1, board)]
+    moves2 = [calc_path_moves(path2, board)]
+    for _ in range(max_iter):
+        for paths in [paths1, paths2]:
+#         for paths, moves in zip([paths1, paths2], [moves1, moves2]):
+#             weights = np.array([1. / calc_path_moves(path, board) for path in paths])
+#             weights /= weights.sum()
+#             path = paths[np.random.choice(range(len(paths)), p=weights)]
+            path = random.choice(paths)
+            for forward in [True, False]:
+                new_path = perturb_path(path, board, forward=forward)
+                if new_path:
+                    paths.append(new_path)
+#                     moves.append(calc_path_moves(new_path, board))
+#         if max_iter % 100:
+#             min_moves = min(moves1 + moves2)
+#             idx1 = np.flatnonzero(moves1 < 1.5 * min_moves)
+#             idx2 = np.flatnonzero(moves2 < 1.5 * min_moves)
+#             paths1 = [paths1[i] for i in idx1]
+#             paths2 = [paths2[i] for i in idx2]
+#             moves1 = [moves1[i] for i in idx1]
+#             moves2 = [moves2[i] for i in idx2]
+    best_path = min(paths1 + paths2, key=lambda x: calc_path_moves(x, board))
+    return best_path
 
 
 def distance(pos1, pos2, xsize):
@@ -91,7 +176,7 @@ def distance(pos1, pos2, xsize):
         adx = max(0, adx - (ady + 1) / 2)
     else:
         adx = max(0, adx - (ady) / 2)
-    d = ceil(adx + ady)
+    d = math.ceil(adx + ady)
     return d
 
 
@@ -105,7 +190,7 @@ def tile_cost(ntiles):
 
 
 def level_cost(level):
-    return round(10 * sqrt(level))
+    return round(10 * math.sqrt(level))
 
 
 def level_modifier(level):
