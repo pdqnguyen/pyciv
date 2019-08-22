@@ -136,6 +136,14 @@ class TileArray(np.ndarray):
     def tiles(self):
         return [tile for tile in self]
 
+    def contains(self, pos):
+        return (
+            pos[0] >= 0 and
+            pos[0] < self.shape[0] and
+            pos[1] >= 0 and
+            pos[1] < self.shape[1]
+        )
+
     @property
     def n_tiles(self):
         return len([tile for tile in self if tile is not None])

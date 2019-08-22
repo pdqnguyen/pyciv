@@ -3,6 +3,14 @@ import string
 import math
 import multiprocessing as mp
 import numpy as np
+from queue import PriorityQueue
+
+
+NEIGHBOR_DX = {
+    0: [-1, 0, 1, 0, -1, -1],
+    1: [0, 1, 1, 1, 0, -1]
+}
+NEIGHBOR_DY = [1, 1, 0, -1, -1, 0]
 
 
 def tiles_in_range(pos, r, shape):
@@ -21,18 +29,12 @@ def tiles_in_range(pos, r, shape):
 
 
 def neighbor(pos, n, xmax):
-    if pos[1] % 2 != 0:
-        dx = [0, 1, 1, 1, 0, -1]
-        dy = [1, 1, 0, -1, -1, 0]
-    else:
-        dx = [-1, 0, 1, 0, -1, -1]
-        dy = [1, 1, 0, -1, -1, 0]
-    x = pos[0] + dx[n]
+    x = pos[0] + NEIGHBOR_DX[pos[1] % 2][n]
     if x > xmax:
         x -= xmax + 1
     elif x < 0:
         x += xmax + 1
-    y = pos[1] + dy[n]
+    y = pos[1] + NEIGHBOR_DY[n]
     return x, y
 
 
@@ -93,73 +95,37 @@ def calc_path_moves(path, board):
     return sum(board[p].moves for p in path[1:])
 
 
-def perturb_path(path, board, forward=True):
-    xmax = board.shape[0] - 1
-    ymax = board.shape[1] - 1
-    weights = np.array([board[p].moves for p in path[1:]]).astype(float)
-    weights /= weights.sum()
-    i = np.random.choice(range(1, len(path)), p=weights)
-    nbs = []
-    for j in range(6):
-        nb = neighbor(path[i - 1], j, xmax)
-        if nb not in path and nb[1] <= ymax:
-            nb_nbs = [neighbor(nb, k, xmax) for k in range(6)]
-            if not (nb in nb_nbs and path[i - 1] in nb_nbs):
-                nbs.append(nb)
-    if nbs:
-        weights = np.array([1 / board[nb].moves for nb in nbs])
-        weights /= weights.sum()
-        new_tile = nbs[np.random.choice(range(len(nbs)), p=weights)]
-        if path[-1] == (6, 2):
-            print(path[i - 1], nbs, nb)
-        if forward:
-            segment1 = create_path(new_tile, path[-1], xmax)
-            segment2 = create_path(new_tile, path[-1], xmax, wrap=True)
-            segment = min((segment1, segment2), key=lambda x: calc_path_moves(x, board))
-            new_path = path[:i] + segment
-        else:
-            segment1 = create_path(path[0], new_tile, xmax)
-            segment2 = create_path(path[0], new_tile, xmax, wrap=True)
-            segment = min((segment1, segment2), key=lambda x: calc_path_moves(x, board))
-            new_path = segment + path[i - 1:]
-        return new_path
-
-
-def find_best_path(start, end, board, max_iter=300):
-    xmax = board.shape[0] - 1
-    ymax = board.shape[1] - 1
-    path1 = create_path(start, end, xmax)
-    path2 = create_path(start, end, xmax, wrap=True)
-    if len(path1) < 3:
-        return path1
-    elif len(path2) < 3:
-        return path2
-    paths1 = [path1]
-    paths2 = [path2]
-    moves1 = [calc_path_moves(path1, board)]
-    moves2 = [calc_path_moves(path2, board)]
-    for _ in range(max_iter):
-        for paths in [paths1, paths2]:
-#         for paths, moves in zip([paths1, paths2], [moves1, moves2]):
-#             weights = np.array([1. / calc_path_moves(path, board) for path in paths])
-#             weights /= weights.sum()
-#             path = paths[np.random.choice(range(len(paths)), p=weights)]
-            path = random.choice(paths)
-            for forward in [True, False]:
-                new_path = perturb_path(path, board, forward=forward)
-                if new_path:
-                    paths.append(new_path)
-#                     moves.append(calc_path_moves(new_path, board))
-#         if max_iter % 100:
-#             min_moves = min(moves1 + moves2)
-#             idx1 = np.flatnonzero(moves1 < 1.5 * min_moves)
-#             idx2 = np.flatnonzero(moves2 < 1.5 * min_moves)
-#             paths1 = [paths1[i] for i in idx1]
-#             paths2 = [paths2[i] for i in idx2]
-#             moves1 = [moves1[i] for i in idx1]
-#             moves2 = [moves2[i] for i in idx2]
-    best_path = min(paths1 + paths2, key=lambda x: calc_path_moves(x, board))
-    return best_path
+def find_best_path(start, goal, board):
+    class PriorityEntry(object):
+        def __init__(self, priority, data):
+            self.data = data
+            self.priority = priority
+        def __lt__(self, other):
+            return self.priority < other.priority
+    frontier = PriorityQueue()
+    frontier.put(PriorityEntry(0, start))
+    came_from = {}
+    cost_so_far = {}
+    came_from[start] = None
+    cost_so_far[start] = 0
+    while not frontier.empty():
+        current = frontier.get()
+        if current.data == goal:
+            break
+        for i in range(6):
+            nb = neighbor(current.data, i, board.shape[0] - 1)
+            if board.contains(nb):
+                new_cost = cost_so_far[current.data] + board[nb].moves
+                if nb not in cost_so_far or new_cost < cost_so_far[nb]:
+                    cost_so_far[nb] = new_cost
+                    priority = new_cost
+                    frontier.put(PriorityEntry(new_cost, nb))
+                    came_from[nb] = current.data
+    path = [goal]
+    while path[-1] != start:
+        path.append(came_from[path[-1]])
+    path = path[::-1]
+    return path, cost_so_far[goal]
 
 
 def distance(pos1, pos2, xsize):
