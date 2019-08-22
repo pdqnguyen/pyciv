@@ -16,7 +16,7 @@ from . import utils as civutils
 
 SQRT3 = math.sqrt(3)
 
-TILE_INFO_DELAY = 3
+TILE_INFO_DELAY = 1
 
 
 def colorname2pg(name):
@@ -124,6 +124,21 @@ class RenderGrid(pg.Surface):
                 self.draw_territory(tile.pos, color)
         for unit in civ.units:
             self.draw_unit(unit.pos, color)
+        return
+
+    def draw_settler_scores(self, scores, font):
+        for i in range(scores.shape[0]):
+            for j in range(scores.shape[1]):
+                score = scores[i, j]
+                text = font.render(str(score), 1, (255, 255, 255))
+                text_rect = text.get_rect()
+                if j % 2 == 0:
+                    x = SQRT3 * self.radius * (i + 0.5)
+                else:
+                    x = SQRT3 * self.radius * (i + 1)
+                y = 1.5 * self.radius * (j + 1)
+                text_rect.bottomleft = (x, y)
+                self.blit(text, text_rect)
         return
 
     def draw(self, highlight=None):
@@ -366,6 +381,8 @@ class RenderGame(object):
                                     for p in user_state['path']:
                                         grid.draw_territory(p, pg.Color(255, 0, 0))
                                 highlight = user_state['active_unit'].get_moves(self.game)
+                                if user_state['active_unit']._class == 'settler':
+                                    grid.draw_settler_scores(self.game.settler_scores(), font)
                             elif 'attack' in user_state['menu_selection']:
                                 highlight = user_state['active_unit'].get_targets(self.game)
                             else:
@@ -402,6 +419,14 @@ class RenderGame(object):
 
     def show_distance(self, surface, font, distance, mouse):
         text = font.render(str(distance), 1, (255, 255, 255))
+        text_rect = text.get_rect()
+        text_rect.bottomleft = (mouse[0], mouse[1] - font.get_height())
+        surface.blit(text, text_rect)
+        return
+
+    def show_settler_score(self, surface, font, pos, mouse):
+        score = self.game.settler_score(pos)
+        text = font.render(str(score), 1, (255, 255, 255))
         text_rect = text.get_rect()
         text_rect.bottomleft = (mouse[0], mouse[1] - font.get_height())
         surface.blit(text, text_rect)

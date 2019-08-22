@@ -1,5 +1,6 @@
 import random
 import time
+import numpy as np
 
 from . import mapmaker
 from .civilizations import Civilization
@@ -132,6 +133,25 @@ class Game(object):
         capital = (False if civ.capital else True)
         self.add_city(tile, civ, name, capital=capital)
         civ.remove_unit(unit)
+
+    def settler_scores(self):
+        out = np.zeros_like(self.board)
+        for i in range(out.shape[0]):
+            for j in range(out.shape[1]):
+                tile = self.board[i, j]
+                if self.get_civ(tile):
+                    out[i, j] = 0
+                else:
+                    total = sum(tile.yields.values())
+                    for nb in civutils.neighbors((i, j), self.board, r=1):
+                        if self.get_civ(nb):
+                            total += 0
+                        elif nb.resources:
+                            total += 2 * sum(nb.yields.values())
+                        else:
+                            total += sum(nb.yields.values())
+                    out[i, j] = total
+        return out
 
     def worker_action(self, unit, action):
         tile = self.board[unit.pos]
