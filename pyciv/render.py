@@ -270,17 +270,20 @@ class RenderGame(object):
                 if self.game.active_civ().name not in self.game.humans:
                     self.game.cpu_turn()
                 # render loop
-                hover_tile = None
-                hover_tile_time = time.time()
-                active_tile = None
-                active_unit = None
-                active_city = None
-                menu_selection = None
-                path = None
+                user_state = dict(
+                    hover_tile = None,
+                    hover_tile_time = time.time(),
+                    active_tile = None,
+                    active_unit = None,
+                    active_city = None,
+                    menu_selection = None,
+                    path = None,
+                    distance = 0
+                )
                 i = 0
                 while True:
-                    active_civ = self.game.active_civ().name
-                    if active_civ not in self.game.humans:
+                    user_state['active_civ'] = self.game.active_civ().name
+                    if user_state['active_civ'] not in self.game.humans:
                         if i > 0:
                             time.sleep(0.1)
                             break
@@ -293,8 +296,8 @@ class RenderGame(object):
                     civ = self.game.get_civ(tile)
                     if unit and not civ:
                         civ = self.game.find_civ(unit.civ)
-                    unit_selected = (unit and unit.pos == tile.pos and unit.civ == active_civ)
-                    city_selected = (city and city.tiles[0] == tile and city.civ == active_civ)
+                    unit_selected = (unit and unit.pos == tile.pos and unit.civ == user_state['active_civ'])
+                    city_selected = (city and city.tiles[0] == tile and city.civ == user_state['active_civ'])
                     pressed = False
                     for ev in pg.event.get():
                         if ev.type == QUIT:
@@ -303,48 +306,48 @@ class RenderGame(object):
                         if ev.type == MOUSEBUTTONDOWN:
                             pressed = True
                         if ev.type == MOUSEBUTTONUP:
-                            if menu_selection == 'move':
-                                self.game.move_unit(active_unit, tile)
-                                active_unit = None
-                                menu_selection = None
+                            if user_state['menu_selection'] == 'move':
+                                self.game.move_unit(user_state['active_unit'], tile)
+                                user_state['active_unit'] = None
+                                user_state['menu_selection'] = None
                                 break
-                            elif menu_selection in ['melee attack', 'range attack']:
-                                self.game.combat_action(active_unit, tile, menu_selection)
-                                active_unit = None
-                                menu_selection = None
+                            elif user_state['menu_selection'] in ['melee attack', 'range attack']:
+                                self.game.combat_action(user_state['active_unit'], tile, user_state['menu_selection'])
+                                user_state['active_unit'] = None
+                                user_state['menu_selection'] = None
                                 break
                             if city_selected:
-                                active_tile = tile
-                                active_city = city
+                                user_state['active_tile'] = tile
+                                user_state['active_city'] = city
                                 if unit_selected:
-                                    active_unit = unit
-                                PopupMenu(city_menu_data(self.game, active_city, civ, unit=active_unit))#, pos=(0, 0))
+                                    user_state['active_unit'] = unit
+                                PopupMenu(city_menu_data(self.game, user_state['active_city'], civ, unit=user_state['active_unit']))#, pos=(0, 0))
                             elif unit_selected:
-                                active_unit = unit
-                                PopupMenu(unit_menu_data(self.game, active_unit, civ))
+                                user_state['active_unit'] = unit
+                                PopupMenu(unit_menu_data(self.game, user_state['active_unit'], civ))
                             else:
-                                active_unit = None
-                                active_city = None
+                                user_state['active_unit'] = None
+                                user_state['active_city'] = None
                                 pass #PopupMenu(menu_data())
                         elif ev.type == USEREVENT:
                             if ev.code == 'MENU':
-                                menu_selection = handle_menu(
-                                    ev, self.game, active_tile, active_city, civ)
-                                active_unit_class = (active_unit._class if active_unit else None)
-                                active_unit_actions = (active_unit.actions(self.game) if active_unit else [])
-                                if menu_selection in active_unit_actions:
-                                    if menu_selection == 'move':
+                                user_state['menu_selection'] = handle_menu(
+                                    ev, self.game, user_state['active_tile'], user_state['active_city'], civ)
+                                active_unit_class = (user_state['active_unit']._class if user_state['active_unit'] else None)
+                                active_unit_actions = (user_state['active_unit'].actions(self.game) if user_state['active_unit'] else [])
+                                if user_state['menu_selection'] in active_unit_actions:
+                                    if user_state['menu_selection'] == 'move':
                                         pass
-                                    elif menu_selection == 'settle':
-                                        self.game.settle(active_unit)
-                                        active_unit = None
-                                        menu_selection = None
+                                    elif user_state['menu_selection'] == 'settle':
+                                        self.game.settle(user_state['active_unit'])
+                                        user_state['active_unit'] = None
+                                        user_state['menu_selection'] = None
                                     elif active_unit_class == 'worker':
-                                        self.game.worker_action(active_unit, menu_selection)
-                                    elif menu_selection == 'fortify':
-                                        active_unit.fortify()
-                                        active_unit = None
-                                        menu_selection = None
+                                        self.game.worker_action(user_state['active_unit'], user_state['menu_selection'])
+                                    elif user_state['menu_selection'] == 'fortify':
+                                        user_state['active_unit'].fortify()
+                                        user_state['active_unit'] = None
+                                        user_state['menu_selection'] = None
                                     else:
                                         pass
                         elif ev.type == KEYDOWN:
@@ -354,21 +357,21 @@ class RenderGame(object):
                             elif ev.key == pg.K_RETURN and pg.key.get_mods() & pg.KMOD_SHIFT:
                                 self.game.end_turn()
                     # Highlight tiles
-                    if active_unit:
-                        if menu_selection:
-                            if menu_selection == 'move':
-                                if hover_tile != tile and tile is not None:
-                                    path = civutils.find_best_path(active_unit.pos, tile.pos, self.game.board)
-                                if path:
-                                    for p in path:
+                    if user_state['active_unit']:
+                        if user_state['menu_selection']:
+                            if user_state['menu_selection'] == 'move':
+                                if user_state['hover_tile'] != tile and tile is not None:
+                                    user_state['path'], user_state['distance'] = civutils.find_best_path(user_state['active_unit'].pos, tile.pos, self.game.board)
+                                if user_state['path']:
+                                    for p in user_state['path']:
                                         grid.draw_territory(p, pg.Color(255, 0, 0))
-                                highlight = active_unit.get_moves(self.game)
-                            elif 'attack' in menu_selection:
-                                highlight = active_unit.get_targets(self.game)
+                                highlight = user_state['active_unit'].get_moves(self.game)
+                            elif 'attack' in user_state['menu_selection']:
+                                highlight = user_state['active_unit'].get_targets(self.game)
                             else:
                                 highlight = None
                     elif city_selected:
-                        highlight = city.tiles
+                        highlight = None #city.tiles
                     else:
                         highlight = None
                     grid2.draw(highlight)
@@ -377,14 +380,14 @@ class RenderGame(object):
                     self.show_turn(surface, font)
                     self.show_button(surface, (0, 0), "End turn", font, pressed)
                     if tile:
-                        if active_unit:
-                            if menu_selection == 'move':
-                                if path:
-                                    self.show_distance(surface, font, path, mouse)
-                        if hover_tile != tile:
-                            hover_tile = tile
-                            tile_hover_time = time.time()
-                        if time.time() - tile_hover_time > TILE_INFO_DELAY:
+                        if user_state['active_unit']:
+                            if user_state['menu_selection'] == 'move':
+                                if user_state['path']:
+                                    self.show_distance(surface, font, user_state['distance'], mouse)
+                        if user_state['hover_tile'] != tile:
+                            user_state['hover_tile'] = tile
+                            user_state['tile_hover_time'] = time.time()
+                        if time.time() - user_state['tile_hover_time'] > TILE_INFO_DELAY:
                             self.show_tile_info(surface, tile, mouse, font)
                     pg.display.update()
                     clock.tick(self.rate)
@@ -397,9 +400,8 @@ class RenderGame(object):
                 return t, p
         return None, None
 
-    def show_distance(self, surface, font, path, mouse):
-        d = civutils.calc_path_moves(path, self.game.board)
-        text = font.render(str(d), 1, (255, 255, 255))
+    def show_distance(self, surface, font, distance, mouse):
+        text = font.render(str(distance), 1, (255, 255, 255))
         text_rect = text.get_rect()
         text_rect.bottomleft = (mouse[0], mouse[1] - font.get_height())
         surface.blit(text, text_rect)
