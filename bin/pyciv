@@ -11,9 +11,10 @@ if __name__ == '__main__':
     parser.add_argument("-r", "--rate", type=int, default=30)
     parser.add_argument("--mapconfig", default="map.ini")
     parser.add_argument("--random-seed", type=float)
+    parser.add_argument("--ai-only", default=False, action="store_true")
     args = parser.parse_args()
     if args.random_seed:
         import random
         random.seed(args.random_seed)
-    game = Game(args.board, civs=['France', 'England', 'America'], leaders=['Me', 'You', 'Other'], map_config_file=args.mapconfig)
+    game = Game(args.board, civs=['France', 'America'], leaders=['Me', 'You'], map_config_file=args.mapconfig, ai_only=args.ai_only)
     RenderGame(game, screen=args.screen, rate=args.rate).render()
