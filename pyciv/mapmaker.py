@@ -226,7 +226,7 @@ def make(shape, map_config_file=None):
     std_num_islands = base_config['std_num_islands']
     if std_num_continents > 0:
         n_conts = random.normalvariate(avg_num_continents, std_num_continents)
-        n_conts = max(2, int(round(n_conts)))
+        n_conts = max(1, int(round(n_conts)))
     else:
         n_conts = avg_num_continents
     n_isls = random.normalvariate(avg_num_islands, std_num_islands)
@@ -239,23 +239,29 @@ def make(shape, map_config_file=None):
             avg_cont_size, std_cont_size)
         cont_size = max(min_cont_size, cont_size)
         cont = build_landmass(board, cont_size, stretch=base_config['continent_stretch'])
-        build_coastline(board, cont)
-        if len(cont) >= min_cont_size:
-            conts.append(cont)
+        if cont is not None:
+            build_coastline(board, cont)
+            if len(cont) >= min_cont_size:
+                conts.append(cont)
+            else:
+                isls.append(cont)
+            if len(conts) >= n_conts:
+                break
         else:
-            isls.append(cont)
-        if len(conts) >= n_conts:
             break
     for _ in range(MAX_ITER):
         isl_size = random.randint(1, min_cont_size - 1)
         isl = build_landmass(board, isl_size, stretch=base_config['island_stretch'])
-        build_coastline(
-            board,
-            isl,
-            max_coast_width=base_config['max_coast_width'],
-            coast_density=base_config['coast_density'])
-        isls.append(isl)
-        if len(isls) >= n_isls:
+        if isl is not None:
+            build_coastline(
+                board,
+                isl,
+                max_coast_width=base_config['max_coast_width'],
+                coast_density=base_config['coast_density'])
+            isls.append(isl)
+            if len(isls) >= n_isls:
+                break
+        else:
             break
     build_icecaps(
         board,
