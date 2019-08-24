@@ -4,6 +4,8 @@ from collections import Counter
 
 from . import YIELD_TYPES
 from . import utils as civutils
+from .buildings import BUILDINGS
+from .units import UNITS
 
 
 MAX_ITER = 10
@@ -17,36 +19,13 @@ class AI:
 
     def play(self, game):
         civ = self.civ
+        print(civ.name)
         for unit in civ.units:
-            action, target = self.unit_action(unit, game)
-            if action is not None:
-                if action == 'move':
-                    game.move_unit(unit, target)
-                elif action == 'settle':
-                    game.settle(unit)
-                elif 'attack' in action:
-                    game.combat_action(unit, target, action)
-                elif unit._class == 'worker':
-                    game.worker_action(unit, action)
-#            i = 0
-#            while unit.actions(game) and i < MAX_ITER:
-#                action = random.choice(unit.actions(game))
-#                if action == 'move':
-#                    moves = unit.get_moves(game)
-#                    if moves:
-#                        move = random.choice(moves)
-#                        game.move_unit(unit, move)
-#                elif action == 'settle':
-#                    game.settle(unit)
-#                    break
-#                elif 'attack' in action:
-#                    targets = unit.get_targets(game)
-#                    if targets:
-#                        target = random.choice(targets)
-#                        game.combat_action(unit, target, action)
-#                elif unit._class == 'worker':
-#                    game.worker_action(unit, action)
-#                i += 1
+            i = 0
+            max_attempts = unit.moves
+            while unit.moves > 0 and i < max_attempts:
+                eval('self.{}_action(unit, game)'.format(unit._type))
+                i += 1
         for city in civ:
             if not city.prod:
                 prod_opts = city.prod_options()
@@ -54,31 +33,104 @@ class AI:
                     prod = random.choice(prod_opts)
                     city.begin_prod(prod)
 
-    def unit_action(self, unit, game):
-        choices = []
-        for action in unit.actions(game):
-            if action == 'move':
-                moves = unit.get_moves(game)
-                for move in moves:
-                    choices.append((action, move, 1))
-            elif action == 'settle':
-                choices.append((action, None, 1))
-            elif 'attack' in action:
-                targets = unit.get_targets(game)
-                if targets:
-                    for target in targets:
-                        choices.append((action, target, 1))
-            elif unit._class == 'worker':
-                choices.append((action, None, 1))
-        if len(choices) > 0:
-            actions, targets, weights = zip(*choices)
-            idx = random.choices(range(len(weights)), weights)[0]
-            return actions[idx], targets[idx]
+    def settler_action(self, unit, game):
+        pos = unit.pos
+        tile = game.board[pos]
+        neighbors = civutils.neighbors(pos, game.board, 2)
+        tiles = [tile] + neighbors
+        scores = {}
+        for t in [tile] + tiles:
+            score = game.settler_score(t.pos, game.find_civ(unit.civ))
+            if t.moves <= unit.movement and score > 0:
+                scores[t.pos] = score
+        if scores:
+            best = max(scores.keys(), key=lambda x: scores[x])
+            if best == pos:
+                game.settle(unit)
+            else:
+                path, _ = civutils.find_best_path(pos, best, game)
+                game.move_unit(unit, game.board[path[1]])
+        elif 'settle' in unit.actions(game):
+            game.settle(unit)
         else:
-            return None, None
+            nb = random.choice(civutils.neighbors(pos, game.board))
+            game.move_unit(unit, nb)
+
+    def worker_action(self, unit, game):
+        pos = unit.pos
+        tiles = game.board.tiles()
+        scores = {}
+        for t in tiles:
+            score = game.worker_score(t.pos, game.find_civ(unit.civ))
+            if t.moves <= unit.movement and score > 0:
+                scores[t.pos] = score
+        if scores:
+            best = max(scores.keys(), key=lambda x: scores[x])
+            if best == pos:
+                actions = [action for action in unit.actions(game) if action != 'move']
+                if actions:
+                    action = random.choice(actions)
+                    game.worker_action(unit, action)
+            else:
+                path, cost = civutils.find_best_path(pos, best, game)
+                game.move_unit(unit, game.board[path[1]])
+        else:
+            nb = random.choice(civutils.neighbors(pos, game.board))
+            game.move_unit(unit, nb)
+
+    def combat_action(self, unit, game):
+        tile = game.board[unit.pos]
+        attack_type = unit.attack + ' attack'
+        target_tiles = unit.get_targets(game)
+        move_tiles = unit.get_moves(game)
+        if target_tiles:
+            weights = []
+            for target_tile in target_tiles:
+                target_unit = game.get_unit(target_tile)
+                target_city = game.get_city(target_tile)
+                if target_city and target_unit:
+                    atk_dmg, def_dmg = civutils.calc_city_damage(unit, target_city, tile, target_tile, attack_type, garrison=target_unit)
+                elif target_city:
+                    atk_dmg, def_dmg = civutils.calc_city_damage(unit, target_city, tile, target_tile, attack_type)
+                elif target_unit:
+                    atk_dmg, def_dmg = civutils.calc_unit_damage(unit, target_unit, tile, target_tile, attack_type)
+                w = atk_dmg
+                weights.append(w)
+            weights = np.array(weights) / sum(weights)
+            if weights.mean() > 0.:
+                target_tile = np.random.choice(target_tiles, p=weights)
+                game.combat_action(unit, target_tile, attack_type)
+                return
+            elif unit.hp > 30:
+                game.combat_action(unit, tile, 'fortify')
+                return
+        if move_tiles:
+            paths = []
+            for civ in game.civs:
+                if civ.name != unit.civ:
+                    for city in civ.cities:
+                        path, cost = civutils.find_best_path(unit.pos, city.pos, game)
+                        if len(path) > 2:
+                            paths.append((path, cost))
+            if paths:
+                shortest_path = min(paths, key=lambda x: x[1])[0]
+                game.move_unit(unit, game.board[shortest_path[1]])
+            else:
+                game.move_unit(unit, random.choice(civutils.neighbors(unit.pos, game.board)))
+            return
+        if 'fortify' in unit.actions(game):
+            game.combat_action(unit, tile, 'fortify')
+            return
 
     def city_action(self, city, game):
-        choices = []
+        civ = game.find_civ(city.civ)
         prod_opts = city.prod_options()
+        weights = []
         for prod in prod_opts:
-            choices.append(prod, prod.cost['production'])
+            w = 1
+            if prod == 'worker':
+                workers = [u for u in civ.units if u._class == 'worker']
+                if len(workers) > 3:
+                    w = 0
+            weights.append(w)
+        prod = np.random.choice(prod_opts, p=weights)

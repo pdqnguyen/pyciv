@@ -17,7 +17,7 @@ class City(object):
         self.tile_progress = 0
         self._init_buildings(buildings=buildings, capital=capital)
         self.capital = capital
-        self.strength = 1
+        self.strength = 30
         self.max_hp = 100
         self.hp = 100
 
@@ -42,21 +42,29 @@ class City(object):
         self.pp += n
 
     def begin_prod(self, item):
-        if item in BUILDINGS.keys():
-            self.prod = Building(item)
-        elif item in UNITS.keys():
-            self.prod = create_unit(item, item)
+        self.prod = item
         self.prod_progress = 0
 
     def update_prod(self):
         self.prod_progress += max(0, self.yields['production'])
         if self.prod:
-            cost = self.prod.cost['production']
+            cost = self.get_item_cost(self.prod, 'production')
             if self.prod_progress >= cost:
-                new_item = self.prod
+                item = self.prod
+                if item in BUILDINGS.keys():
+                    out = Building(item)
+                elif item in UNITS.keys():
+                    name = 'unit' + civutils.random_str(8)
+                    out = create_unit(name, item)
                 self.prod = None
-                self.prod_progress -= cost
-                return new_item
+                self.prod_progress = 0
+                return out
+
+    def get_item_cost(self, item, yield_type):
+        if item in BUILDINGS.keys():
+            return BUILDINGS[item]['cost'][yield_type]
+        elif item in UNITS.keys():
+            return UNITS[item]['cost'][yield_type]
 
     def prod_options(self):
         out = []
@@ -73,7 +81,7 @@ class City(object):
         cost = civutils.pp_cost(self.pp)
         if self.pp_progress > cost:
             self.grow(1)
-            self.pp_progress -= cost
+            self.pp_progress = 0
 
     def update_tiles(self, game):
         self.tile_progress += self.yields['culture']
@@ -93,8 +101,11 @@ class City(object):
                 self.tiles.append(tile)
                 self.tile_progress = 0
 
-    def update_hp(self):
-        self.hp = min(self.max_hp, self.hp + 10)
+    def update_hp(self, hp=None):
+        if hp:
+            self.hp = hp
+        else:
+            self.hp = min(self.max_hp, self.hp + 10)
 
     @property
     def yields(self):

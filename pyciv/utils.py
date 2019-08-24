@@ -151,7 +151,7 @@ def distance(pos1, pos2, xsize):
 
 def pp_cost(pp):
     n = pp - 1
-    return (15 + 8 * n + n ** 1.5)
+    return (15 + 3 * n + n ** 1.3)
 
 
 def tile_cost(ntiles):
@@ -163,7 +163,7 @@ def level_cost(level):
 
 
 def level_modifier(level):
-    return 1. + 0.5 * (level - 1)
+    return 1. + 0.2 * (level - 1)
 
 
 def calc_unit_damage(unit1, unit2, unit1_tile, unit2_tile, attack):

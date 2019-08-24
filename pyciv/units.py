@@ -6,24 +6,24 @@ UNITS = {
         'type': 'settler',
         'movement': 2,
         'cost': {
-            'gold': 100,
-            'production': 50
+            'gold': 200,
+            'production': 70
         }
     },
     'worker': {
         'type': 'worker',
         'movement': 2,
         'cost': {
-            'gold': 50,
-            'production': 30
+            'gold': 200,
+            'production': 70
         }
     },
     'warrior': {
         'type': 'combat',
         'movement': 2,
         'cost': {
-            'gold': 30,
-            'production': 20
+            'gold': 160,
+            'production': 60
         },
         'strength': 10,
         'attack': 'melee'
@@ -32,8 +32,8 @@ UNITS = {
         'type': 'combat',
         'movement': 2,
         'cost': {
-            'gold': 30,
-            'production': 20
+            'gold': 160,
+            'production': 60
         },
         'strength': 7,
         'attack': 'range',
@@ -75,19 +75,21 @@ class Unit:
 
     def get_moves(self, game):
         out = []
-        neighbors = civutils.neighbors(self.pos, game.board)
+        neighbors = civutils.neighbors(self.pos, game.board, r=self.moves)
         for tile in neighbors:
-            if self.moves >= tile.moves:
-                target_unit = game.get_unit(tile)
-                target_city = game.get_city(tile)
-                if not target_unit and not target_city:
-                    out.append(tile)
-                elif target_unit:
-                    if target_unit.civ == self.civ and target_unit._class != self._class:
+            path, cost = civutils.find_best_path(self.pos, tile.pos, game)
+            if cost <= self.moves:
+                if self.moves >= tile.moves:
+                    target_unit = game.get_unit(tile)
+                    target_city = game.get_city(tile)
+                    if not target_unit and not target_city:
                         out.append(tile)
-                elif target_city:
-                    if target_city.civ == self.civ:
-                        out.append(tile)
+                    elif target_unit:
+                        if target_unit.civ == self.civ and target_unit._type != self._type:
+                            out.append(tile)
+                    elif target_city:
+                        if target_city.civ == self.civ:
+                            out.append(tile)
         return out
 
 
@@ -97,10 +99,14 @@ class SettlerUnit(Unit):
 
     def actions(self, game):
         out = (['move'] if self.get_moves(game) else [])
-        nearby_tiles = civutils.neighbors(self.pos, game.board, r=3)
-        if not any(game.get_city(tile) for tile in nearby_tiles) and not (game.board[self.pos].base == 'ocean'):
-            out.append('settle')
+        if self.moves > 0:
+            nearby_tiles = civutils.neighbors(self.pos, game.board, r=3)
+            if game.settler_score(self.pos, game.find_civ(self.civ)) > 0:
+                out.append('settle')
         return out
+
+    def def_strength(self, tile):
+        return 0
 
     def end_turn(self, game):
         self.reset_moves()
@@ -113,17 +119,19 @@ class WorkerUnit(Unit):
 
     def actions(self, game):
         out = (['move'] if self.get_moves(game) else [])
-        if self.moves == 0:
-            return out
-        tile = game.board[self.pos]
-        civ = game.get_civ(tile)
-        city = game.get_city(tile)
-        civ_name = (civ.name if civ else '')
-        if self.civ == civ_name and not city:
-            if ('forest' in tile.features or 'rainforest' in tile.features) and 'lumber mill' not in tile.improvements:
-                out.append('chop')
-            out += improvement_options(tile)
+        if self.moves > 0:
+            tile = game.board[self.pos]
+            civ = game.get_civ(tile)
+            city = game.get_city(tile)
+            civ_name = (civ.name if civ else '')
+            if self.civ == civ_name and not city:
+                if ('forest' in tile.features or 'rainforest' in tile.features) and 'lumber mill' not in tile.improvements:
+                    out.append('chop')
+                out += improvement_options(tile)
         return out
+
+    def def_strength(self, tile):
+        return 0
 
     def end_turn(self, game):
         self.reset_moves()
@@ -217,4 +225,3 @@ class CombatUnit(Unit):
             print("{} leveled up".format(self.name))
             self.exp = 0
             self.level += 1
-            self.strength *= 10

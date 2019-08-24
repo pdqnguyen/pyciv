@@ -11,12 +11,13 @@ from .bases import BASE_COLORS
 from .features import FEATURE_COLORS
 from .civilizations import CIV_COLORS
 from .menu import PopupMenu
+from . import menu_data
 from . import utils as civutils
 
 
 SQRT3 = math.sqrt(3)
 
-TILE_INFO_DELAY = 1
+TILE_INFO_DELAY = 0.2
 
 
 def colorname2pg(name):
@@ -126,18 +127,17 @@ class RenderGrid(pg.Surface):
             self.draw_unit(unit.pos, color)
         return
 
-    def draw_settler_scores(self, scores, font):
-        for i in range(scores.shape[0]):
-            for j in range(scores.shape[1]):
-                score = scores[i, j]
-                text = font.render(str(score), 1, (255, 255, 255))
+    def draw_text_grid_overlay(self, array, font):
+        for i in range(array.shape[0]):
+            for j in range(array.shape[1]):
+                text = font.render(str(array[i, j]), 1, (255, 255, 255))
                 text_rect = text.get_rect()
                 if j % 2 == 0:
                     x = SQRT3 * self.radius * (i + 0.5)
                 else:
                     x = SQRT3 * self.radius * (i + 1)
                 y = 1.5 * self.radius * (j + 1)
-                text_rect.bottomleft = (x, y)
+                text_rect.center = (x, y - font.get_height())
                 self.blit(text, text_rect)
         return
 
@@ -170,95 +170,6 @@ class RenderGrid(pg.Surface):
     def _get_civ_color(civ):
         c_color = CIV_COLORS.get(civ)
         return colorname2pg(c_color)
-
-
-def menu_data():
-    data = (
-        'Main',
-        'End turn',
-        'Close menu',
-        'Quit game',
-    )
-    return data
-
-
-def city_menu_data(game, city, civ, unit=None):
-    prod_current = "Production - {} ({:.1f}/{})".format(
-        city.prod.name,
-        city.prod_progress,
-        city.prod.cost['production']
-    ) if city.prod else "Production"
-    prod_options = city.prod_options() if city.prod_options() else ["No production options"]
-    buildings = [b.name for b in city.buildings]
-    civ_menu = civ_menu_data(civ)
-    unit_menu = (unit_menu_data(game, unit, civ) if unit else "No unit stationed")
-    data = (
-        "{} ({})".format(city.name, city.civ),
-        (
-            prod_current,
-            (
-                "Choose production",
-                *prod_options
-            ),
-            (
-                "Buildings",
-                *buildings
-            )
-        ),
-        civ_menu,
-        unit_menu,
-        "End turn",
-        "Close menu",
-    )
-    return data
-
-
-def unit_menu_data(game, unit, civ):
-    civ_menu = civ_menu_data(civ)
-    if unit._class == 'worker':
-        data = (
-            "Unit actions ({} moves, {} builds remaining)".format(unit.moves, unit.builds),
-        )
-    else:
-        data = (
-            "Unit actions ({} moves remaining)".format(unit.moves),
-        )
-    data += (
-        "{} ({})".format(unit.name, unit._class),
-    )
-    for action in unit.actions(game):
-        data += (action,)
-    data += (civ_menu,)
-    return data
-
-
-def civ_menu_data(civ):
-    yields_menu = ("Yields",)
-    totals_menu = ("Totals",)
-    for k, v in civ.yields.items():
-        yields_menu += ("{}: {:.1f}".format(k, v),)
-    for k, v in civ.totals.items():
-        totals_menu += ("{}: {:.1f}".format(k, v),)
-    data = (
-        "Civilization menu",
-        yields_menu,
-        totals_menu
-    )
-    return data
-
-
-def handle_menu(e, game, tile, city, civ):
-    if e.name == "Choose production...":
-        if e.text != "No production options":
-            city.begin_prod(e.text)
-    elif "Unit actions" in e.name:
-        return e.text.lower()
-    elif e.text == "Close menu":
-        return
-    elif e.text == "End turn":
-        game.end_turn()
-    elif e.text == "Quit game":
-        quit()
 
 
 class RenderGame(object):
@@ -307,47 +218,60 @@ class RenderGame(object):
                     mouse = pg.mouse.get_pos()
                     tile, polygon = self.get_tile(polygons, mouse)
                     unit = self.game.get_unit(tile)
+                    units = self.game.get_units(tile)
                     city = self.game.get_city(tile)
                     civ = self.game.get_civ(tile)
                     if unit and not civ:
                         civ = self.game.find_civ(unit.civ)
                     unit_selected = (unit and unit.pos == tile.pos and unit.civ == user_state['active_civ'])
                     city_selected = (city and city.tiles[0] == tile and city.civ == user_state['active_civ'])
-                    pressed = False
                     for ev in pg.event.get():
                         if ev.type == QUIT:
                             pg.quit()
                             sys.exit()
                         if ev.type == MOUSEBUTTONDOWN:
                             pressed = True
+                        else:
+                            pressed = False
                         if ev.type == MOUSEBUTTONUP:
                             if user_state['menu_selection'] == 'move':
                                 self.game.move_unit(user_state['active_unit'], tile)
                                 user_state['active_unit'] = None
                                 user_state['menu_selection'] = None
                                 break
-                            elif user_state['menu_selection'] in ['melee attack', 'range attack']:
-                                self.game.combat_action(user_state['active_unit'], tile, user_state['menu_selection'])
-                                user_state['active_unit'] = None
-                                user_state['menu_selection'] = None
-                                break
+                            elif user_state['active_unit']:
+                                if user_state['menu_selection'] in user_state['active_unit'].actions(self.game) and user_state['active_unit']._type == 'combat':
+                                    self.game.combat_action(user_state['active_unit'], tile, user_state['menu_selection'])
+                                    user_state['active_unit'] = None
+                                    user_state['menu_selection'] = None
+                                    break
                             if city_selected:
                                 user_state['active_tile'] = tile
                                 user_state['active_city'] = city
-                                if unit_selected:
-                                    user_state['active_unit'] = unit
-                                PopupMenu(city_menu_data(self.game, user_state['active_city'], civ, unit=user_state['active_unit']))#, pos=(0, 0))
+                                city_units = self.game.get_units(user_state['active_tile'])
+                                PopupMenu(menu_data.get_city_options(self.game, user_state['active_city'], civ, units=city_units))#, pos=(0, 0))
                             elif unit_selected:
+#                                 user_state['active_unit'] = unit
+#                                 PopupMenu(menu_data.get_unit_options(self.game, user_state['active_unit'], civ))
+                                user_state['active_tile'] = tile
                                 user_state['active_unit'] = unit
-                                PopupMenu(unit_menu_data(self.game, user_state['active_unit'], civ))
+                                if len(units) > 1:
+                                    PopupMenu(menu_data.get_multi_unit_options(self.game, units, civ))
+                                elif len(units) == 1:
+                                    PopupMenu(menu_data.get_unit_options(self.game, user_state['active_unit'], civ))
                             else:
                                 user_state['active_unit'] = None
                                 user_state['active_city'] = None
-                                pass #PopupMenu(menu_data())
+                                PopupMenu(menu_data.get_default_options())
                         elif ev.type == USEREVENT:
                             if ev.code == 'MENU':
                                 user_state['menu_selection'] = handle_menu(
                                     ev, self.game, user_state['active_tile'], user_state['active_city'], civ)
+                                if type(user_state['menu_selection']) is tuple:
+                                    active_units = self.game.get_units(user_state['active_tile'])
+                                    active_unit_names = [u.name for u in active_units]
+                                    user_state['active_unit'] = active_units[active_unit_names.index(user_state['menu_selection'][0])]
+                                    user_state['menu_selection'] = user_state['menu_selection'][1]
                                 active_unit_class = (user_state['active_unit']._class if user_state['active_unit'] else None)
                                 active_unit_actions = (user_state['active_unit'].actions(self.game) if user_state['active_unit'] else [])
                                 if user_state['menu_selection'] in active_unit_actions:
@@ -360,13 +284,12 @@ class RenderGame(object):
                                     elif active_unit_class == 'worker':
                                         self.game.worker_action(user_state['active_unit'], user_state['menu_selection'])
                                     elif user_state['menu_selection'] == 'fortify':
-                                        user_state['active_unit'].fortify()
+                                        self.game.combat_action(user_state['active_unit'], tile, user_state['menu_selection'])
                                         user_state['active_unit'] = None
                                         user_state['menu_selection'] = None
                                     else:
                                         pass
                         elif ev.type == KEYDOWN:
-                            keypress = pg.key.get_pressed()
                             if ev.key == pg.K_c and pg.key.get_mods() & pg.KMOD_CTRL:
                                 raise KeyboardInterrupt
                             elif ev.key == pg.K_RETURN and pg.key.get_mods() & pg.KMOD_SHIFT:
@@ -376,13 +299,15 @@ class RenderGame(object):
                         if user_state['menu_selection']:
                             if user_state['menu_selection'] == 'move':
                                 if user_state['hover_tile'] != tile and tile is not None:
-                                    user_state['path'], user_state['distance'] = civutils.find_best_path(user_state['active_unit'].pos, tile.pos, self.game.board)
+                                    user_state['path'], user_state['distance'] = civutils.find_best_path(user_state['active_unit'].pos, tile.pos, self.game)
                                 if user_state['path']:
                                     for p in user_state['path']:
                                         grid.draw_territory(p, pg.Color(255, 0, 0))
                                 highlight = user_state['active_unit'].get_moves(self.game)
                                 if user_state['active_unit']._class == 'settler':
-                                    grid.draw_settler_scores(self.game.settler_scores(), font)
+                                    grid.draw_text_grid_overlay(self.game.settler_scores(user_state['active_unit']), font)
+                                if user_state['active_unit']._class == 'worker':
+                                    grid.draw_text_grid_overlay(self.game.worker_scores(user_state['active_unit']), font)
                             elif 'attack' in user_state['menu_selection']:
                                 highlight = user_state['active_unit'].get_targets(self.game)
                             else:
@@ -432,15 +357,24 @@ class RenderGame(object):
         surface.blit(text, text_rect)
         return
 
+    def show_worker_score(self, surface, font, pos, mouse):
+        score = self.game.worker_score(pos)
+        text = font.render(str(score), 1, (255, 255, 255))
+        text_rect = text.get_rect()
+        text_rect.bottomleft = (mouse[0], mouse[1] - font.get_height())
+        surface.blit(text, text_rect)
+        return
+
     def tile_info_text(self, tile):
         lines = []
-        unit = self.game.get_unit(tile)
+        units = self.game.get_units(tile)
         city = self.game.get_city(tile)
         civ = self.game.get_civ(tile)
-        if unit:
-            lines.append("{} - {}".format(unit.name, unit._class))
-            if type(unit).__name__ == 'CombatUnit':
-                lines.append("HP: {}, CS: {}/{}".format(unit.hp, unit.atk_strength(tile), unit.def_strength(tile)))
+        if units:
+            for unit in units:
+                lines.append("{} - {}".format(unit.name, unit._class))
+                if type(unit).__name__ == 'CombatUnit':
+                    lines.append("HP: {}, CS: {}/{}".format(unit.hp, unit.atk_strength(tile), unit.def_strength(tile)))
         if city:
             lines.append("{} ({}){}".format(city.name, city.pp, "*" if city.capital else 0))
             lines.append("HP: {}, CS: {}".format(city.hp, city.def_strength(tile)))
@@ -496,15 +430,34 @@ class RenderGame(object):
             max([font.size(line)[0] for line in lines]),
             font.get_height() * len(lines)
         )
+        x, y = pos
+        if x > self.screen[0] - box[0]:
+            x -= box[0]
+        if y > self.screen[1] - box[1]:
+            y -= box[1]
         tile_text_bg_rect = pg.Rect(
-            pos[0], pos[1], box[0], box[1])
+            x, y, box[0], box[1])
         tile_text_bg = pg.draw.rect(
             surface, pg.Color(0, 0, 0), tile_text_bg_rect)
         for i, line in enumerate(lines):
             tile_text = font.render(
                 line, 1, (255, 255, 255))
             tile_text_rect = tile_text.get_rect()
-            text_pos = (pos[0], pos[1] + font.get_height() * i)
+            text_pos = (x, y + font.get_height() * i)
             tile_text_rect.topleft = text_pos
             surface.blit(tile_text, tile_text_rect)
         return
+
+
+def handle_menu(e, game, tile, city, civ):
+    if e.name == "Choose production...":
+        if e.text != "No production options":
+            city.begin_prod(e.text)
+    elif "Unit actions" in e.name:
+        return (e.name.split()[2], e.text.lower())
+    elif e.text == "Close menu":
+        return
+    elif e.text == "End turn":
+        game.end_turn()
+    elif e.text == "Quit game":
+        quit()

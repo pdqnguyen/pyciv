@@ -9,17 +9,21 @@ from . import utils as civutils
 from .buildings import Building
 from .units import Unit
 from .ai import AI
+from .improvements import improvement_options
 
 MAX_ITER = 1000
 MIN_CITY_SEP = 4
 MAP_ATTEMPTS = 10
 
 class Game(object):
-    def __init__(self, shape, civs, leaders, map_config_file=None):
+    def __init__(self, shape, civs, leaders, map_config_file=None, ai_only=False):
         self.shape = shape
         self.civs = [Civilization(civ, leaders) for civ in civs]
         self._init_ai()
-        self.humans = civs[:1]
+        if ai_only:
+            self.humans = []
+        else:
+            self.humans = civs[0]
         self._init_map(map_config_file=map_config_file)
         self._init_civs()
         self.turn = 0
@@ -55,9 +59,9 @@ class Game(object):
                         unit1_name = 'unit' + civutils.random_str(8)
                         unit2_name = 'unit' + civutils.random_str(8)
                         self.add_unit(tile1, civ, unit1_name, 'settler')
-#                         self.add_unit(tile2, civ, unit2_name, 'warrior')
-                        for nb in civutils.neighbors(tile1.pos, self.board, 1)[:3]:
-                            self.add_unit(nb, civ, unit2_name, 'warrior')
+                        self.add_unit(tile2, civ, unit2_name, 'warrior')
+#                         for nb in civutils.neighbors(tile1.pos, self.board, 1)[:]:
+#                             self.add_unit(nb, civ, unit2_name, 'warrior')
                         break
                 i += 1
 
@@ -84,12 +88,24 @@ class Game(object):
                     if tile == city.tiles[0]:
                         return city
 
-    def get_unit(self, tile):
+    def get_units(self, tile):
+        units = []
         for civ in self.civs:
             for unit in civ.units:
                 if tile:
                     if tile.pos == unit.pos:
-                        return unit
+                        units.append(unit)
+        return units
+
+    def get_unit(self, tile):
+        units = self.get_units(tile)
+        unit_types = [unit._type for unit in units]
+        if 'combat' in unit_types:
+            return units[unit_types.index('combat')]
+        elif len(units) > 0:
+            return units[0]
+        else:
+            return None
 
     def add_city(self, tile, civ, name, **kwargs):
         tile.remove_features(*['forest', 'rainforest'])
@@ -108,21 +124,9 @@ class Game(object):
         old_civ.remove_city(city)
 
     def move_unit(self, unit, tile):
-        neighbors = civutils.neighbors(unit.pos, self.board)
-        if (tile in neighbors) and (unit.moves >= tile.moves):
-            target_unit = self.get_unit(tile)
-            target_city = self.get_city(tile)
-            if target_unit:
-                if target_unit.civ != unit.civ or target_unit._class != unit._class:
-                    print("another unit is in the way")
-                    return
-            if target_city:
-                if target_city.civ != unit.civ:
-                    print("cannot enter enemy city")
-                    return
-            if type(unit).__name__ == 'CombatUnit':
-                unit.unfortify()
-            unit.move(tile.pos, tile.moves)
+        if tile in unit.get_moves(self):
+            path, cost = civutils.find_best_path(unit.pos, tile.pos, self)
+            unit.move(tile.pos, cost)
         else:
             print("invalid move")
 
@@ -134,23 +138,30 @@ class Game(object):
         self.add_city(tile, civ, name, capital=capital)
         civ.remove_unit(unit)
 
-    def settler_scores(self):
+    def settler_score(self, pos, civ):
+        tile = self.board[pos]
+        tile_civ = self.get_civ(tile)
+        occupied = (tile_civ and (tile_civ != civ))
+        near_city = any(self.get_city(nb) for nb in civutils.neighbors(pos, self.board, r=3))
+        if occupied or near_city:
+            return 0
+        else:
+            total = sum(tile.yields.values())
+            for nb in civutils.neighbors(pos, self.board, r=1):
+                if self.get_civ(nb):
+                    total += 0
+                elif nb.resources:
+                    total += 2 * sum(nb.yields.values())
+                else:
+                    total += sum(nb.yields.values())
+            return total
+
+    def settler_scores(self, settler):
         out = np.zeros_like(self.board)
         for i in range(out.shape[0]):
             for j in range(out.shape[1]):
-                tile = self.board[i, j]
-                if self.get_civ(tile):
-                    out[i, j] = 0
-                else:
-                    total = sum(tile.yields.values())
-                    for nb in civutils.neighbors((i, j), self.board, r=1):
-                        if self.get_civ(nb):
-                            total += 0
-                        elif nb.resources:
-                            total += 2 * sum(nb.yields.values())
-                        else:
-                            total += sum(nb.yields.values())
-                    out[i, j] = total
+                pos = (i, j)
+                out[pos] = self.settler_score(pos, self.find_civ(settler.civ))
         return out
 
     def worker_action(self, unit, action):
@@ -171,6 +182,25 @@ class Game(object):
         if unit.builds == 0:
             del unit
 
+    def worker_score(self, pos, civ):
+        tile = self.board[pos]
+        tile_civ = self.get_civ(tile)
+        if tile_civ == civ and not self.get_city(tile) and improvement_options(tile):
+            if tile.resources:
+                return 2 * sum(tile.yields.values())
+            else:
+                return sum(tile.yields.values())
+        else:
+            return 0
+
+    def worker_scores(self, worker):
+        out = np.zeros_like(self.board)
+        for i in range(out.shape[0]):
+            for j in range(out.shape[1]):
+                pos = (i, j)
+                out[pos] = self.worker_score(pos, self.find_civ(worker.civ))
+        return out
+
     def combat_action(self, unit, target_tile, action):
         unit_tile = self.board[unit.pos]
         civ = self.find_civ(unit.civ)
@@ -188,16 +218,23 @@ class Game(object):
                     target_hp = target_city.hp
                     if action == 'melee attack':
                         if hp > 0 and target_hp <= 0:
-                            print("{} ({}) took over {} ({})".format(unit.name, civ.name, target_city.name, target_civ.name))
+                            print("{} ({}) took over {} ({})".format(unit._class, civ.name, target_city.name, target_civ.name))
                             self.change_civ(target_city, civ)
+                            if target_unit:
+                                target_civ.remove_unit(target_unit)
                             self.move_unit(unit, target_tile)
+                            unit.move(unit.pos, unit.moves)
                             unit.update_exp(2)
+                            target_city.update_hp(50)
                         elif hp <= 0 and target_hp > 0:
-                            print("{} ({}) died while attacking {} ({})".format(unit.name, civ.name, target_city.name, target_civ.name))
+                            print("{} ({}) died while attacking {} ({})".format(unit._class, civ.name, target_city.name, target_civ.name))
                             civ.remove_unit(unit)
                         else:
-                            unit.move(unit.pos, 1)
+                            unit.move(unit.pos, unit.moves)
                             unit.update_exp(2)
+                    elif action == 'range attack':
+                        unit.move(unit.pos, unit.moves)
+                        unit.update_exp(1)
             elif target_unit:
                 target_unit_type = type(target_unit).__name__
                 target_civ = self.find_civ(target_unit.civ)
@@ -205,14 +242,14 @@ class Game(object):
                     unit.unfortify()
                     if target_unit_type == 'CombatUnit':
                         atk_dmg, def_dmg = civutils.calc_unit_damage(unit, target_unit, unit_tile, target_tile, action)
-                        print("{} ({}) did {} damage to {} ({})".format(unit.name, civ.name, atk_dmg, target_unit.name, target_civ.name))
-                        print("{} ({}) did {} damage to {} ({})".format(target_unit.name, target_civ.name, def_dmg, unit.name, civ.name))
+                        print("{} ({}) did {} damage to {} ({})".format(unit._class, civ.name, atk_dmg, target_unit._class, target_civ.name))
+                        print("{} ({}) did {} damage to {} ({})".format(target_unit._class, target_civ.name, def_dmg, unit._class, civ.name))
                         target_unit.damage(atk_dmg)
                         unit.damage(def_dmg)
                         hp = unit.hp
                         target_hp = target_unit.hp
                         if hp > 0 and target_hp <= 0:
-                            print("{} ({}) killed {} ({})".format(unit.name, civ.name, target_unit.name, target_civ.name))
+                            print("{} ({}) killed {} ({})".format(unit._class, civ.name, target_unit._class, target_civ.name))
                             target_civ.remove_unit(target_unit)
                             if action == 'melee attack':
                                 unit.move(target_tile.pos, target_tile.moves)
@@ -220,11 +257,11 @@ class Game(object):
                                 unit.move(unit.pos, 1)
                             unit.update_exp(2)
                         elif hp <= 0 and target_hp > 0:
-                            print("{} ({}) died while attacking {} ({})".format(unit.name, civ.name, target_unit.name, target_civ.name))
+                            print("{} ({}) died while attacking {} ({})".format(unit._class, civ.name, target_unit._class, target_civ.name))
                             civ.remove_unit(unit)
                             target_unit.update_exp(1)
                         elif hp <= 0 and target_hp <= 0:
-                            print("{} ({}) and {} ({}) died fighting".format(unit.name, civ.name, target_unit.name, target_civ.name))
+                            print("{} ({}) and {} ({}) died fighting".format(unit._class, civ.name, target_unit._class, target_civ.name))
                             civ.remove_unit(unit)
                             target_civ.remove_unit(target_unit)
                         else:
@@ -232,10 +269,11 @@ class Game(object):
                             unit.move(unit.pos, 1)
                             unit.update_exp(2)
                     elif target_unit_type in ['WorkerUnit', 'SettlerUnit']:
-                        print("{} ({}) killed {} ({})".format(unit.name, civ.name, target_unit.name, target_civ.name))
+                        print("{} ({}) killed {} ({})".format(unit._class, civ.name, target_unit._class, target_civ.name))
                         target_civ.remove_unit(target_unit)
-                        unit.move(target_tile.pos, target_tile.moves)
-        elif action == 'fortified':
+                        if action == 'melee attack':
+                            unit.move(target_tile.pos, target_tile.moves)
+        elif action == 'fortify':
             unit.fortify()
             unit.move(unit.pos, unit.moves)
 
@@ -262,10 +300,10 @@ class Game(object):
             if unit._class == 'worker':
                 if unit.builds == 0:
                     civ.remove_unit(unit)
-        self.turn += 1
         self.active += 1
         if self.active >= len(self.civs):
             self.active = 0
+            self.turn += 1
 
     def cpu_turn(self):
         self.ai[self.active_civ().name].play(self)
