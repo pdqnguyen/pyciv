@@ -96,6 +96,7 @@ def calc_path_moves(path, board):
 
 
 def find_best_path(start, goal, game):
+    unit = game.get_unit(game.board[start])
     class PriorityEntry(object):
         def __init__(self, priority, data):
             self.data = data
@@ -116,8 +117,10 @@ def find_best_path(start, goal, game):
             nb = neighbor(current.data, i, game.board.shape[0] - 1)
             if game.board.contains(nb):
                 nb_cost = game.board[nb].moves
-                if game.get_unit(game.board[nb]):
-                    nb_cost += 100
+                nb_unit = game.get_unit(game.board[nb])
+                if unit is not None and nb_unit is not None:
+                    if unit.civ != nb_unit.civ or unit._type == nb_unit._type:
+                        nb_cost += 100
                 new_cost = cost_so_far[current.data] + nb_cost
                 if nb not in cost_so_far or new_cost < cost_so_far[nb]:
                     cost_so_far[nb] = new_cost
