@@ -211,30 +211,40 @@ class Game(object):
                 target_civ = self.find_civ(target_city.civ)
                 if civ != target_civ:
                     unit.unfortify()
-                    atk_dmg, def_dmg = civutils.calc_city_damage(unit, target_city, unit_tile, target_tile, action, garrison=target_unit)
-                    target_city.damage(atk_dmg)
-                    unit.damage(def_dmg)
-                    hp = unit.hp
-                    target_hp = target_city.hp
-                    if action == 'melee attack':
-                        if hp > 0 and target_hp <= 0:
-                            print("{} ({}) took over {} ({})".format(unit._class, civ.name, target_city.name, target_civ.name))
-                            self.change_civ(target_city, civ)
-                            if target_unit:
-                                target_civ.remove_unit(target_unit)
-                            self.move_unit(unit, target_tile)
-                            unit.move(unit.pos, unit.moves)
-                            unit.update_exp(2)
-                            target_city.update_hp(50)
-                        elif hp <= 0 and target_hp > 0:
-                            print("{} ({}) died while attacking {} ({})".format(unit._class, civ.name, target_city.name, target_civ.name))
-                            civ.remove_unit(unit)
-                        else:
-                            unit.move(unit.pos, unit.moves)
-                            unit.update_exp(2)
-                    elif action == 'range attack':
+                    if action == 'melee attack' and target_city.hp == 0:
+                        print("{} ({}) took over {} ({})".format(unit._class, civ.name, target_city.name, target_civ.name))
+                        self.change_civ(target_city, civ)
+                        if target_unit:
+                            target_civ.remove_unit(target_unit)
+                        self.move_unit(unit, target_tile)
                         unit.move(unit.pos, unit.moves)
-                        unit.update_exp(1)
+                        unit.update_exp(2)
+                        target_city.update_hp(50)
+                    else:
+                        atk_dmg, def_dmg = civutils.calc_city_damage(unit, target_city, unit_tile, target_tile, action, garrison=target_unit)
+                        target_city.damage(atk_dmg)
+                        unit.damage(def_dmg)
+                        hp = unit.hp
+                        target_hp = target_city.hp
+                        if action == 'melee attack':
+                            if hp > 0 and target_hp <= 0:
+                                print("{} ({}) took over {} ({})".format(unit._class, civ.name, target_city.name, target_civ.name))
+                                self.change_civ(target_city, civ)
+                                if target_unit:
+                                    target_civ.remove_unit(target_unit)
+                                self.move_unit(unit, target_tile)
+                                unit.move(unit.pos, unit.moves)
+                                unit.update_exp(2)
+                                target_city.update_hp(50)
+                            elif hp <= 0 and target_hp > 0:
+                                print("{} ({}) died while attacking {} ({})".format(unit._class, civ.name, target_city.name, target_civ.name))
+                                civ.remove_unit(unit)
+                            else:
+                                unit.move(unit.pos, unit.moves)
+                                unit.update_exp(2)
+                        elif action == 'range attack':
+                            unit.move(unit.pos, unit.moves)
+                            unit.update_exp(1)
             elif target_unit:
                 target_unit_type = type(target_unit).__name__
                 target_civ = self.find_civ(target_unit.civ)
