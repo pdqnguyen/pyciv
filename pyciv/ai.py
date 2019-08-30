@@ -88,22 +88,31 @@ class AI:
             for target_tile in target_tiles:
                 target_unit = game.get_unit(target_tile)
                 target_city = game.get_city(target_tile)
-                if target_city and target_unit:
-                    atk_dmg, def_dmg = civutils.calc_city_damage(unit, target_city, tile, target_tile, attack_type, garrison=target_unit)
-                elif target_city:
-                    atk_dmg, def_dmg = civutils.calc_city_damage(unit, target_city, tile, target_tile, attack_type)
+                if target_city:
+                    if target_city.hp == 0:
+                        w = 100
+                    elif target_unit:
+                        atk_dmg, def_dmg = civutils.calc_city_damage(unit, target_city, tile, target_tile, attack_type, garrison=target_unit)
+                        w = atk_dmg - def_dmg
+                    else:
+                        atk_dmg, def_dmg = civutils.calc_city_damage(unit, target_city, tile, target_tile, attack_type)
+                        w = atk_dmg - def_dmg
                 elif target_unit:
                     atk_dmg, def_dmg = civutils.calc_unit_damage(unit, target_unit, tile, target_tile, attack_type)
-                w = atk_dmg
-                weights.append(w)
-            weights = np.array(weights) / sum(weights)
-            if weights.mean() > 0.:
+                    w = atk_dmg - def_dmg
+                else:
+                    w = 0
+                weights.append(max(w, 0))
+            if max(weights) > 0:
+                weights = np.array(weights) / sum(weights)
                 target_tile = np.random.choice(target_tiles, p=weights)
                 game.combat_action(unit, target_tile, attack_type)
                 return
             elif unit.hp > 30:
                 game.combat_action(unit, tile, 'fortify')
                 return
+            else:
+                pass
         if move_tiles:
             paths = []
             for civ in game.civs:
