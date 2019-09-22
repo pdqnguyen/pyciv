@@ -2,7 +2,6 @@ def get_default_options():
     options = (
         'Main',
         'End turn',
-        'Close menu',
         'Quit game',
     )
     return options
@@ -36,7 +35,6 @@ def get_city_options(game, city, civ, units=[]):
         options += ((get_unit_options(game, unit, civ),) if unit else ("No unit stationed",))
     options += (
         "End turn",
-        "Close menu",
     )
     return options
 
