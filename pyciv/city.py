@@ -20,6 +20,9 @@ class City(object):
         self.strength = 30
         self.max_hp = 100
         self.hp = 100
+        self.range = 2
+        self.range_strength = 20
+        self.moves = 1
 
     def __iter__(self):
         for tile in self.tiles:
@@ -32,7 +35,7 @@ class City(object):
 
     @property
     def pos(self):
-        return self.tiles[0].x, self.tiles[1].y
+        return self.tiles[0].x, self.tiles[0].y
 
     def add_building(self, *args):
         for building in args:
@@ -75,6 +78,18 @@ class City(object):
                 out.append(k)
         return out
 
+    def get_targets(self, game):
+        out = []
+        if self.moves > 0:
+            range_ = getattr(self, 'range', 1)
+            for tile in civutils.neighbors(self.pos, game.board, range_):
+                target_unit = game.get_unit(tile)
+                target_city = game.get_city(tile)
+                if target_unit is not None:
+                    if target_unit.civ != self.civ and target_unit._type == 'combat':
+                        out.append(tile)
+        return out
+
     def update_pp(self):
         surplus = self.yields['food'] - (2 * self.pp)
         self.pp_progress += surplus
@@ -107,6 +122,9 @@ class City(object):
         else:
             self.hp = min(self.max_hp, self.hp + 10)
 
+    def set_moves(self, moves):
+        self.moves = moves
+
     @property
     def yields(self):
         pp_scale = min(1, self.pp / len(self.tiles))
@@ -122,6 +140,10 @@ class City(object):
                 val += b.yields.get(y, 0)
                 mod *= b.modifiers.get(y, 1)
             out[y] += val * mod
+        return out
+
+    def atk_strength(self, tile):
+        out = self.range_strength * tile.attack_modifier()
         return out
 
     def def_strength(self, tile):

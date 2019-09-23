@@ -3,37 +3,40 @@ import time
 import numpy as np
 
 from . import mapmaker
-from .civilizations import Civilization
-from .render import RenderGame
 from . import utils as civutils
+from . import bots as civbots
+from .utils import Action
+from .civilizations import Civilization
+from .city import City
 from .buildings import Building
 from .units import Unit
-from .ai import AI
 from .improvements import improvement_options
 
 MAX_ITER = 1000
 MIN_CITY_SEP = 4
 MAP_ATTEMPTS = 10
 
-class Game(object):
-    def __init__(self, shape, civs, leaders, map_config_file=None, ai_only=False):
+
+class Game:
+
+    def __init__(self, shape, civs, leaders, map_config_file=None, bots_only=False):
         self.shape = shape
         self.civs = [Civilization(civ, leaders) for civ in civs]
-        self._init_ai()
-        if ai_only:
+        self._init_bot()
+        if bots_only:
             self.humans = []
         else:
-            self.humans = civs[0]
+            self.humans = civs[:1]
         self._init_map(map_config_file=map_config_file)
         self._init_civs()
         self.turn = 0
         self.active = 0
 
-    def _init_ai(self):
-        ai = {}
+    def _init_bot(self):
+        bots = {}
         for civ in self.civs:
-            ai[civ.name] = AI(civ)
-        self.ai = ai
+            bots[civ.name] = civbots.BasicBot(civ)
+        self.bots = bots
 
     def _init_map(self, map_config_file=None):
         for _ in range(MAP_ATTEMPTS):
@@ -49,21 +52,38 @@ class Game(object):
         open_tiles = [tile for tile in self.board if tile.base != 'ocean' and 'mountain' not in tile.features]
         for civ in self.civs:
             i = 0
-            while open_tiles and i < MAX_ITER:
+            while True:
+                if len(open_tiles) == 0 or i > MAX_ITER:
+                    raise RuntimeError("failed to initialize players")
                 random.shuffle(open_tiles)
                 tile1 = open_tiles.pop(0)
                 if (tile1.base != 'ocean') and ('ice' not in tile1.features) and ('mountain' not in tile1.features) and (not self.get_civ(tile1)):
                     neighbors = civutils.neighbors(tile1.pos, self.board, 5)
                     if not any(self.get_unit(nb) for nb in neighbors):
                         tile2 = random.choice(civutils.neighbors(tile1.pos, self.board, 1))
-                        unit1_name = 'unit' + civutils.random_str(8)
-                        unit2_name = 'unit' + civutils.random_str(8)
-                        self.add_unit(tile1, civ, unit1_name, 'settler')
-                        self.add_unit(tile2, civ, unit2_name, 'warrior')
-#                         for nb in civutils.neighbors(tile1.pos, self.board, 1)[:]:
-#                             self.add_unit(nb, civ, unit2_name, 'warrior')
-                        break
+                        if (tile2.base != 'ocean') and ('ice' not in tile2.features) and ('mountain' not in tile2.features) and (not self.get_civ(tile2)):
+                            unit1_name = 'unit' + civutils.random_str(8)
+                            unit2_name = 'unit' + civutils.random_str(8)
+                            self.add_unit(tile1, civ, unit1_name, 'settler')
+                            self.add_unit(tile2, civ, unit2_name, 'warrior')
+                            break
                 i += 1
+
+    def step(self, action):
+        if action.city and action.target:
+            self.city_action(action.city, action.target, action.name)
+        elif action.unit:
+            if action.name == 'move':
+                self.move_unit(action.unit, action.target)
+            elif action.unit._type == 'combat':
+                self.combat_action(action.unit, action.target, action.name)
+            elif action.unit._type == 'worker':
+                self.worker_action(action.unit, action.name)
+            elif action.name == 'settle':
+                self.settle(action.unit)
+        elif action.name == 'end_turn':
+            self.end_turn()
+        return
 
     def active_civ(self):
         return self.civs[self.active]
@@ -107,6 +127,12 @@ class Game(object):
         else:
             return None
 
+    def get_unit_by_name(self, name):
+        for civ in self.civs:
+            for unit in civ.units:
+                if unit.name == name:
+                    return unit
+
     def add_city(self, tile, civ, name, **kwargs):
         tile.remove_features(*['forest', 'rainforest'])
         tiles = [tile] + self.board.get_neighbors(tile)
@@ -125,10 +151,11 @@ class Game(object):
 
     def move_unit(self, unit, tile):
         if tile in unit.get_moves(self):
-            path, cost = civutils.find_best_path(unit.pos, tile.pos, self)
-            unit.move(tile.pos, cost)
+            path, costs = civutils.find_best_path(unit.pos, tile.pos, self)
+            unit.move(tile.pos, costs[tile.pos])
         else:
-            print("invalid move")
+            print("invalid move ({},{})".format(*tile.pos))
+        return
 
     def settle(self, unit):
         tile = self.board[unit.pos]
@@ -137,6 +164,7 @@ class Game(object):
         capital = (False if civ.capital else True)
         self.add_city(tile, civ, name, capital=capital)
         civ.remove_unit(unit)
+        return
 
     def settler_score(self, pos, civ):
         tile = self.board[pos]
@@ -181,6 +209,7 @@ class Game(object):
         unit.builds -= 1
         if unit.builds == 0:
             del unit
+        return
 
     def worker_score(self, pos, civ):
         tile = self.board[pos]
@@ -286,6 +315,28 @@ class Game(object):
         elif action == 'fortify':
             unit.fortify()
             unit.move(unit.pos, unit.moves)
+        return
+
+    def city_action(self, city, target, action):
+        if action == 'build':
+            city.begin_prod(target)
+        elif action == 'range attack':
+            civ = self.find_civ(city.civ)
+            city_tile = self.board[city.pos]
+            target_unit = self.get_unit(target)
+            target_unit_type = type(target_unit).__name__
+            target_civ = self.find_civ(target_unit.civ)
+            if civ != target_civ and target_unit._type == 'combat':
+                atk_dmg, def_dmg = civutils.calc_unit_damage(city, target_unit, city_tile, target, action)
+                print("city ({}) did {} damage to {} ({})".format(civ.name, atk_dmg, target_unit._class, target_civ.name))
+                target_unit.damage(atk_dmg)
+                target_hp = target_unit.hp
+                if target_hp <= 0:
+                    print("city ({}) killed {} ({})".format(civ.name, target_unit._class, target_civ.name))
+                    target_civ.remove_unit(target_unit)
+                else:
+                    target_unit.update_exp(1)
+                city.set_moves(0)
 
     def end_turn(self):
         civ = self.active_civ()
@@ -304,6 +355,7 @@ class Game(object):
             city.update_tiles(self)
             civ.update_totals(city.yields)
             city.update_hp()
+            city.set_moves(1)
         units = civ.units
         for unit in units:
             unit.end_turn(self)
@@ -318,3 +370,8 @@ class Game(object):
     def cpu_turn(self):
         self.ai[self.active_civ().name].play(self)
         self.end_turn()
+
+    def get_bot_action(self):
+        bot = self.bots[self.active_civ().name]
+        action = bot.get_action(self)
+        return action

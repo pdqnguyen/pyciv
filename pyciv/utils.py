@@ -13,6 +13,15 @@ NEIGHBOR_DX = {
 NEIGHBOR_DY = [1, 1, 0, -1, -1, 0]
 
 
+class Action:
+
+    def __init__(self, name, city=None, unit=None, target=None):
+        self.name = name
+        self.city = city
+        self.unit = unit
+        self.target = target
+
+
 def tiles_in_range(pos, r, shape):
     out = []
     seeds = [pos]
@@ -131,7 +140,7 @@ def find_best_path(start, goal, game):
     while path[-1] != start:
         path.append(came_from[path[-1]])
     path = path[::-1]
-    return path, cost_so_far[goal]
+    return path, cost_so_far
 
 
 def distance(pos1, pos2, xsize):

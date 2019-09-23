@@ -31,6 +31,9 @@ def get_city_options(game, city, civ, units=[]):
         ),
         civ_options,
     )
+    targets = city.get_targets(game)
+    if len(targets) > 0:
+        options += ("City ranged attack",)
     for unit in units:
         options += ((get_unit_options(game, unit, civ),) if unit else ("No unit stationed",))
     options += (

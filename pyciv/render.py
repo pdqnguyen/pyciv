@@ -7,12 +7,13 @@ import sys
 import time
 from matplotlib.colors import to_rgb
 
+from . import menu_data
+from . import utils as civutils
 from .bases import BASE_COLORS
 from .features import FEATURE_COLORS
 from .civilizations import CIV_COLORS
 from .menu import PopupMenu
-from . import menu_data
-from . import utils as civutils
+from .utils import Action
 
 
 SQRT3 = math.sqrt(3)
@@ -26,10 +27,10 @@ def colorname2pg(name):
 
 
 class RenderGrid(pg.Surface):
-    def __init__(self, board, civs, screen=(1280, 720)):
+    def __init__(self, board, civs, screen_size=(1280, 720)):
         self.board = board
         self.civs = civs
-        self.width, self.height = screen
+        self.width, self.height = screen_size
         self.radius = self._radius()
         super(RenderGrid, self).__init__((self.width, self.height))
 
@@ -186,34 +187,72 @@ class UserState:
             setattr(self, k, v)
 
 
-class RenderGame(object):
-    def __init__(self, game, screen=(1920, 1080), rate=30, fontsize=36):
+class RenderGame:
+
+    def __init__(self, game, screen_size=(1920, 1080), rate=30, fontsize=36, window_pos=(0, 40)):
         self.game = game
-        self.screen = screen
+        self.screen_size = screen_size
         self.rate = rate
         self.fontsize = fontsize
         self.user_state = None
+        # Pygame initialization
+        os.environ['SDL_VIDEO_WINDOW_POS'] = '{:d},{:d}'.format(*window_pos)
+        pg.init()
+        self.__game_over = False
+        self.__enable_render = True #enable_render
+        if self.__enable_render:
+            self.surface = pg.display.set_mode(self.screen_size, 1)
+        self.font = pg.font.SysFont("Trebuchet", self.fontsize)
+        self.clock = pg.time.Clock()
+
+        self.grid = RenderGrid(self.game.board, self.game.civs, screen_size=self.screen_size)
+        self.grid2 = RenderGrid(self.game.board, self.game.civs, screen_size=self.screen_size)
+        self.grid2.set_alpha(80)
+
+        # Initialize user interaction state
+        self._init_user_state(
+            hover_tile = None,
+            hover_tile_time = time.time(),
+            active_tile = None,
+            active_unit = None,
+            active_city = None,
+            menu_selection = None,
+            path = None,
+            distance = 0
+        )
 
     def _init_user_state(self, **kwargs):
         self.user_state = UserState(**kwargs)
+
+    def update(self):
+        if self.__enable_render:
+            try:
+                img_output = self.__view_update()
+                #self.__controller_update()
+            except Exception as e:
+                self.quit_game()
+                raise e
+            else:
+                return img_output
 
     def __on_click(self, tile):
         unit = self.game.get_unit(tile)
         units = self.game.get_units(tile)
         city = self.game.get_city(tile)
         civ = self.game.get_civ(tile)
-        unit_selected = (unit and unit.pos == tile.pos and unit.civ == self.user_state.active_civ)
-        city_selected = (city and city.tiles[0] == tile and city.civ == self.user_state.active_civ)
-        if self.user_state.menu_selection == 'move':
-            self.game.move_unit(self.user_state.active_unit, tile)
-            self.user_state.update(active_unit=None, menu_selection=None)
-            return True
-        elif self.user_state.active_unit is not None:
-            active_unit_ = self.user_state.active_unit
-            if self.user_state.menu_selection in active_unit_.actions(self.game) and active_unit_._type == 'combat':
-                self.game.combat_action(active_unit_, tile, self.user_state.menu_selection)
+        unit_selected = (unit and unit.pos == tile.pos and unit.civ == self.game.active_civ().name)
+        city_selected = (city and city.tiles[0] == tile and city.civ == self.game.active_civ().name)
+        active_unit_ = self.user_state.active_unit
+        active_city_ = self.user_state.active_city
+        menu_selection_ = self.user_state.menu_selection
+        if active_unit_:
+            if menu_selection_ in active_unit_.actions(self.game):
                 self.user_state.update(active_unit=None, menu_selection=None)
-                return True
+                return Action(menu_selection_, unit=active_unit_, target=tile)
+        elif active_city_:
+            if menu_selection_ == 'range attack':
+                self.user_state.update(active_city=None, menu_selection=None)
+                return Action(menu_selection_, city=active_city_, target=tile)
         if city_selected:
             self.user_state.update(active_tile=tile, active_city=city)
             city_units = self.game.get_units(self.user_state.active_tile)
@@ -228,138 +267,106 @@ class RenderGame(object):
             self.user_state.update(active_unit=None, active_city=None)
             PopupMenu(menu_data.get_default_options())
 
-    def __on_menu_action(self, ev, tile):
-        menu_selection = handle_menu(ev, self.game)
-        self.user_state.update(menu_selection=menu_selection)
-        if type(self.user_state.menu_selection) is tuple:
-            active_unit_name, active_unit_action = self.user_state.menu_selection
-            active_tile_units = self.game.get_units(self.user_state.active_tile)
-            active_tile_unit_names = [u.name for u in active_tile_units]
-            active_unit = active_tile_units[active_tile_unit_names.index(active_unit_name)]
-            self.user_state.update(
-                active_unit=active_unit,
-                menu_selection=active_unit_action)
-        active_unit_class = (self.user_state.active_unit._class if self.user_state.active_unit else None)
-        active_unit_actions = (self.user_state.active_unit.actions(self.game) if self.user_state.active_unit else [])
-        if self.user_state.menu_selection in active_unit_actions:
-            if self.user_state.menu_selection == 'move':
-                pass
-            elif self.user_state.menu_selection == 'settle':
-                self.game.settle(self.user_state.active_unit)
-                self.user_state.update(active_unit=None, menu_selection=None)
-            elif active_unit_class == 'worker':
-                self.game.worker_action(self.user_state.active_unit, self.user_state.menu_selection)
-            elif self.user_state.menu_selection == 'fortify':
-                self.game.combat_action(self.user_state.active_unit, tile, self.user_state.menu_selection)
-                self.user_state.update(active_unit=None, menu_selection=None)
+    def __on_menu_action(self, ev):
+        if ev.name == "Choose production...":
+            if ev.text != "No production options":
+                active_city = self.user_state.active_city
+                return Action('build', city=active_city, target=ev.text)
+        elif "Unit actions" in ev.name:
+            active_unit_name = ev.name.split()[2]
+            active_unit_action = ev.text.lower()
+            active_unit = self.game.get_unit_by_name(active_unit_name)
+            if (active_unit_action == 'move') or ('attack' in active_unit_action):
+                self.user_state.update(active_unit=active_unit, menu_selection=active_unit_action)
             else:
-                pass
+                self.user_state.update(active_unit=None)
+                return Action(active_unit_action, unit=active_unit)
+        elif ev.text == "City ranged attack":
+            active_city = self.user_state.active_city
+            self.user_state.update(active_city=active_city, menu_selection='range attack')
+        elif ev.text == "End turn":
+            return Action('end_turn')
+        elif ev.text == "Quit game":
+            quit()
 
-    def render(self):
-        os.environ['SDL_VIDEO_WINDOW_POS'] = '0,0'
-        from pygame.locals import QUIT, KEYDOWN, MOUSEBUTTONDOWN, MOUSEBUTTONUP, USEREVENT
-        grid = RenderGrid(self.game.board, self.game.civs, screen=self.screen)
-        grid2 = RenderGrid(self.game.board, self.game.civs, screen=self.screen)
-        grid2.set_alpha(80)
-        try:
-            pg.init()
-            surface = pg.display.set_mode(self.screen, 1)
-            font = pg.font.SysFont("Trebuchet", self.fontsize)
-            clock = pg.time.Clock()
-            self._init_user_state(
-                hover_tile = None,
-                hover_tile_time = time.time(),
-                active_tile = None,
-                active_unit = None,
-                active_city = None,
-                menu_selection = None,
-                path = None,
-                distance = 0
-            )
+    def __view_update(self):
+        while True:
+            polygons = self.grid.draw()
+            mouse = pg.mouse.get_pos()
+            tile, polygon = self.get_tile(polygons, mouse)
+            unit = self.game.get_unit(tile)
+            city = self.game.get_city(tile)
+            civ = self.game.get_civ(tile)
+            if unit and not civ:
+                civ = self.game.find_civ(unit.civ)
+            unit_selected = (unit and unit.pos == tile.pos and unit.civ == self.game.active_civ().name)
+            city_selected = (city and city.tiles[0] == tile and city.civ == self.game.active_civ().name)
+            for ev in pg.event.get():
+                if ev.type == pg.QUIT:
+                    pg.quit()
+                    sys.exit()
+                #==========================================================
+                # HUMAN USER INPUTS
 
-            # game loop
-            while True:
-                if self.game.active_civ().name not in self.game.humans:
-                    self.game.cpu_turn()
-                # render loop
-                self.user_state.reset()
-                i = 0
-                while True:
-                    self.user_state.update(active_civ=self.game.active_civ().name)
-                    if self.user_state.active_civ not in self.game.humans:
-                        if i > 0:
-                            time.sleep(0.1)
-                            break
-                        i += 1
-                    polygons = grid.draw()
-                    mouse = pg.mouse.get_pos()
-                    tile, polygon = self.get_tile(polygons, mouse)
-                    unit = self.game.get_unit(tile)
-                    city = self.game.get_city(tile)
-                    civ = self.game.get_civ(tile)
-                    if unit and not civ:
-                        civ = self.game.find_civ(unit.civ)
-                    unit_selected = (unit and unit.pos == tile.pos and unit.civ == self.user_state.active_civ)
-                    city_selected = (city and city.tiles[0] == tile and city.civ == self.user_state.active_civ)
-                    for ev in pg.event.get():
-                        if ev.type == QUIT:
-                            pg.quit()
-                            sys.exit()
-                        if ev.type == MOUSEBUTTONDOWN:
-                            pressed = True
-                        else:
-                            pressed = False
-                        if ev.type == MOUSEBUTTONUP:
-                            result = self.__on_click(tile)
-                            if result:
-                                break
-                        elif ev.type == USEREVENT:
-                            if ev.code == 'MENU':
-                                self.__on_menu_action(ev, tile)
-                        elif ev.type == KEYDOWN:
-                            if ev.key == pg.K_c and pg.key.get_mods() & pg.KMOD_CTRL:
-                                raise KeyboardInterrupt
-                            elif ev.key == pg.K_RETURN and pg.key.get_mods() & pg.KMOD_SHIFT:
-                                self.game.end_turn()
-                    # Highlight tiles
-                    if self.user_state.active_unit:
-                        if self.user_state.menu_selection:
-                            if self.user_state.menu_selection == 'move':
-                                if self.user_state.hover_tile != tile and tile is not None:
-                                    path, distance = civutils.find_best_path(self.user_state.active_unit.pos, tile.pos, self.game)
-                                    self.user_state.update(path=path, distance=distance)
-                                if self.user_state.path:
-                                    for p in self.user_state.path:
-                                        grid.draw_territory(p, pg.Color(255, 0, 0))
-                                highlight = self.user_state.active_unit.get_moves(self.game)
-                                if self.user_state.active_unit._class == 'settler':
-                                    grid.draw_text_grid_overlay(self.game.settler_scores(self.user_state.active_unit), font)
-                                if self.user_state.active_unit._class == 'worker':
-                                    grid.draw_text_grid_overlay(self.game.worker_scores(self.user_state.active_unit), font)
-                            elif 'attack' in self.user_state.menu_selection:
-                                highlight = self.user_state.active_unit.get_targets(self.game)
-                            else:
-                                highlight = None
-                    else:
-                        highlight = None
-                    grid2.draw(highlight)
-                    surface.blit(grid, (0, 0))
-                    surface.blit(grid2, (0, 0))
-                    self.show_turn(surface, font)
-                    self.show_button(surface, (0, 0), "End turn", font, pressed)
-                    if tile:
-                        if self.user_state.active_unit:
-                            if self.user_state.menu_selection == 'move':
-                                if self.user_state.path:
-                                    self.show_distance(surface, font, self.user_state.distance, mouse)
-                        if self.user_state.hover_tile != tile:
-                            self.user_state.update(hover_tile=tile, tile_hover_time=time.time())
-                        if time.time() - self.user_state.tile_hover_time > TILE_INFO_DELAY:
-                            self.show_tile_info(surface, tile, mouse, font)
-                    pg.display.update()
-                    clock.tick(self.rate)
-        finally:
-            pg.quit()
+                if ev.type == pg.MOUSEBUTTONUP:
+                    user_action = self.__on_click(tile)
+                    if user_action:
+                        self.user_state.reset()
+                        return user_action
+                elif ev.type == pg.USEREVENT:
+                    if ev.code == 'MENU':
+                        user_action = self.__on_menu_action(ev)
+                        if user_action:
+                            self.user_state.reset()
+                            return user_action
+                elif ev.type == pg.KEYDOWN:
+                    if ev.key == pg.K_c and pg.key.get_mods() & pg.KMOD_CTRL:
+                        raise KeyboardInterrupt
+                    elif ev.key == pg.K_RETURN and pg.key.get_mods() & pg.KMOD_SHIFT:
+                        return Action('end_turn') #self.game.end_turn()
+
+                #==========================================================
+            # Highlight tiles
+            if self.user_state.active_unit and self.user_state.menu_selection:
+                if self.user_state.menu_selection == 'move':
+                    if self.user_state.hover_tile != tile and tile is not None:
+                        path, costs = civutils.find_best_path(self.user_state.active_unit.pos, tile.pos, self.game)
+                        distance = costs[tile.pos]
+                        self.user_state.update(path=path, distance=distance)
+                    if self.user_state.path:
+                        for p in self.user_state.path:
+                            self.grid.draw_territory(p, pg.Color(255, 0, 0))
+                    highlight = self.user_state.active_unit.get_moves(self.game)
+                    if self.user_state.active_unit._class == 'settler':
+                        data = self.game.settler_scores(self.user_state.active_unit)
+                        self.grid.draw_text_grid_overlay(data, self.font)
+                    if self.user_state.active_unit._class == 'worker':
+                        data = self.game.worker_scores(self.user_state.active_unit)
+                        self.grid.draw_text_grid_overlay(data, self.font)
+                elif 'attack' in self.user_state.menu_selection:
+                    highlight = self.user_state.active_unit.get_targets(self.game)
+                else:
+                    highlight = None
+            else:
+                highlight = None
+            self.grid2.draw(highlight)
+            self.__blit(self.grid, (0, 0))
+            self.__blit(self.grid2, (0, 0))
+            self.show_turn()
+            if tile:
+                if self.user_state.active_unit:
+                    if self.user_state.menu_selection == 'move':
+                        if self.user_state.path:
+                            self.show_distance(self.user_state.distance, mouse)
+                if self.user_state.hover_tile != tile:
+                    self.user_state.update(hover_tile=tile, tile_hover_time=time.time())
+                if time.time() - self.user_state.tile_hover_time > TILE_INFO_DELAY:
+                    self.show_tile_info(tile, mouse)
+            pg.display.update()
+            self.clock.tick(self.rate)
+
+    def __blit(self, *args):
+        self.surface.blit(*args)
 
     def get_tile(self, polygons, mouse):
         for t, p in polygons:
@@ -367,27 +374,27 @@ class RenderGame(object):
                 return t, p
         return None, None
 
-    def show_distance(self, surface, font, distance, mouse):
-        text = font.render(str(distance), 1, (255, 255, 255))
+    def show_distance(self, distance, mouse):
+        text = self.font.render(str(distance), 1, (255, 255, 255))
         text_rect = text.get_rect()
-        text_rect.bottomleft = (mouse[0], mouse[1] - font.get_height())
-        surface.blit(text, text_rect)
+        text_rect.bottomleft = (mouse[0], mouse[1] - self.font.get_height())
+        self.__blit(text, text_rect)
         return
 
-    def show_settler_score(self, surface, font, pos, mouse):
+    def show_settler_score(self, pos, mouse):
         score = self.game.settler_score(pos)
-        text = font.render(str(score), 1, (255, 255, 255))
+        text = self.font.render(str(score), 1, (255, 255, 255))
         text_rect = text.get_rect()
-        text_rect.bottomleft = (mouse[0], mouse[1] - font.get_height())
-        surface.blit(text, text_rect)
+        text_rect.bottomleft = (mouse[0], mouse[1] - self.font.get_height())
+        self.__blit(text, text_rect)
         return
 
-    def show_worker_score(self, surface, font, pos, mouse):
+    def show_worker_score(self, pos, mouse):
         score = self.game.worker_score(pos)
-        text = font.render(str(score), 1, (255, 255, 255))
+        text = self.font.render(str(score), 1, (255, 255, 255))
         text_rect = text.get_rect()
-        text_rect.bottomleft = (mouse[0], mouse[1] - font.get_height())
-        surface.blit(text, text_rect)
+        text_rect.bottomleft = (mouse[0], mouse[1] - self.font.get_height())
+        self.__blit(text, text_rect)
         return
 
     def tile_info_text(self, tile):
@@ -421,68 +428,48 @@ class RenderGame(object):
         text = "\n".join(lines)
         return text
 
-    def show_tile_info(self, surface, tile, mouse, font):
-        fontheight = font.get_height()
+    def show_tile_info(self, tile, mouse):
         text = self.tile_info_text(tile)
-        self.show_textbox(surface, mouse, text, font)
+        self.show_textbox(mouse, text)
         return
 
-    def show_button(self, surface, pos, text, font, pressed):
-        mouse = pg.mouse.get_pos()
-        click = pg.mouse.get_pressed()
-        box = (font.size(text)[0], font.get_height())
-        rect = pg.Rect((pos[0], pos[1], box[0], box[1]))
-        if rect.collidepoint(mouse):
-            color = pg.Color(100, 100, 100)
-            if pressed:
-                self.game.end_turn()
-        else:
-            color = pg.Color(0, 0, 0)
-        button = font.render(text, 1, (255, 255, 255))
-        pg.draw.rect(surface, color, rect)
-        surface.blit(button, rect)
-        return rect
-
-    def show_turn(self, surface, font):
+    def show_turn(self):
         text = "Turn: {}\nActive civ: {}".format(self.game.turn, self.game.active_civ().name)
-        pos = (self.screen[0] - max(font.size(line)[0] for line in text.splitlines()), 0)
-        self.show_textbox(surface, pos, text, font)
+        pos = (self.screen_size[0] - max(self.font.size(line)[0] for line in text.splitlines()), 0)
+        self.show_textbox(pos, text)
         return
 
-    def show_textbox(self, surface, pos, text, font, color=None):
+    def show_textbox(self, pos, text, color=None):
         lines = text.splitlines()
         box = (
-            max([font.size(line)[0] for line in lines]),
-            font.get_height() * len(lines)
+            max([self.font.size(line)[0] for line in lines]),
+            self.font.get_height() * len(lines)
         )
         x, y = pos
-        if x > self.screen[0] - box[0]:
+        if x > self.screen_size[0] - box[0]:
             x -= box[0]
-        if y > self.screen[1] - box[1]:
+        if y > self.screen_size[1] - box[1]:
             y -= box[1]
         tile_text_bg_rect = pg.Rect(
             x, y, box[0], box[1])
-        tile_text_bg = pg.draw.rect(
-            surface, pg.Color(0, 0, 0), tile_text_bg_rect)
+        tile_text_bg = self.__draw_rect(pg.Color(0, 0, 0), tile_text_bg_rect)
         for i, line in enumerate(lines):
-            tile_text = font.render(
+            tile_text = self.font.render(
                 line, 1, (255, 255, 255))
             tile_text_rect = tile_text.get_rect()
-            text_pos = (x, y + font.get_height() * i)
+            text_pos = (x, y + self.font.get_height() * i)
             tile_text_rect.topleft = text_pos
-            surface.blit(tile_text, tile_text_rect)
+            self.__blit(tile_text, tile_text_rect)
         return
 
+    def __draw_rect(self, color, rect):
+        return pg.draw.rect(self.surface, color, rect)
 
-def handle_menu(e, game):
-    if e.name == "Choose production...":
-        if e.text != "No production options":
-            city.begin_prod(e.text)
-    elif "Unit actions" in e.name:
-        return (e.name.split()[2], e.text.lower())
-    elif e.text == "Close menu":
-        return
-    elif e.text == "End turn":
-        game.end_turn()
-    elif e.text == "Quit game":
-        quit()
+    def quit_game(self):
+        try:
+            self.__game_over = True
+            if self.__enable_render is True:
+                pg.display.quit()
+            pg.quit()
+        except Exception:
+            pass

@@ -77,7 +77,8 @@ class Unit:
         out = []
         neighbors = civutils.neighbors(self.pos, game.board, r=self.moves)
         for tile in neighbors:
-            path, cost = civutils.find_best_path(self.pos, tile.pos, game)
+            path, costs = civutils.find_best_path(self.pos, tile.pos, game)
+            cost = costs[tile.pos]
             if cost <= self.moves:
                 if self.moves >= tile.moves:
                     target_unit = game.get_unit(tile)
